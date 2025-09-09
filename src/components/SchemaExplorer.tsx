@@ -186,6 +186,9 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
                     <div className="flex items-center space-x-2 mb-1">
                       <Table className="w-4 h-4" />
                       <span className="font-medium">{table.name}</span>
+                      {table.meta?.permissionDenied && (
+                        <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded">DENIED</span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500">
                       {table.columns.length} columns • {table.rowCount} rows
@@ -204,7 +207,12 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
               {/* Table Info */}
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900">{selectedTable.name}</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                    <span>{selectedTable.name}</span>
+                    {selectedTable.meta?.permissionDenied && (
+                      <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded">PERMISSION DENIED</span>
+                    )}
+                  </h2>
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
                     <span>{selectedTable.columns.length} columns</span>
                     <span>{selectedTable.rowCount} rows</span>

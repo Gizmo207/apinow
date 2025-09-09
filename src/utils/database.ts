@@ -25,6 +25,10 @@ export interface DatabaseTable {
   name: string;
   rowCount: number;
   columns: DatabaseColumn[];
+  meta?: {
+    permissionDenied?: boolean;
+    source?: string;
+  };
 }
 
 export interface DatabaseColumn {
@@ -421,7 +425,8 @@ export class DatabaseManager {
   // Only check collections we know exist / recommend
   const knownCollections = FIREBASE_KNOWN_COLLECTIONS;
 
-      for (const collectionName of knownCollections) {
+  const permissionDenied: string[] = [];
+  for (const collectionName of knownCollections) {
         try {
           // Try to get documents from this collection
           const snapshot = await getDocs(query(collection(db, collectionName), limit(5)));
@@ -485,9 +490,14 @@ export class DatabaseManager {
             console.log(`Added table: ${collectionName} with ${fullSnapshot.size} documents`);
           }
         } catch (error) {
-          // Collection doesn't exist or no permission, skip it
-          console.log(`Collection ${collectionName} not found or no access:`, error);
-          continue;
+          const message = error instanceof Error ? error.message : String(error);
+            if (message.toLowerCase().includes('missing or insufficient permissions')) {
+              permissionDenied.push(collectionName);
+              console.log(`Permission denied for collection ${collectionName}`);
+            } else {
+              console.log(`Collection ${collectionName} not found or no access:`, message);
+            }
+            continue;
         }
       }
 
@@ -516,6 +526,20 @@ export class DatabaseManager {
         });
       } else {
         console.log(`Found ${tables.length} collections in Firebase project`);
+      }
+
+      // Append placeholders for permission denied collections so UI can surface guidance
+      for (const denied of permissionDenied) {
+        tables.push({
+          id: `collection_${denied}_denied`,
+          name: denied,
+          rowCount: 0,
+          columns: [
+            { name: 'id', type: 'string', nullable: false, primaryKey: true },
+            { name: 'permission', type: 'string', nullable: false, primaryKey: false }
+          ],
+          meta: { permissionDenied: true, source: 'firestore-rules' }
+        });
       }
 
       return tables;
