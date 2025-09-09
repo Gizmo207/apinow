@@ -49,14 +49,18 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
   function mergeRules(existing: string, generated: string): string {
     if (!existing.trim()) return generated;
     try {
-      const docBlockRegex = /(match\s+\/databases\/\{db\}\/documents\s*\{)([\s\S]*?)(\n\s*\})([\s\S]*?\n\s*\})?/m;
+      // Support either {db} or {database} placeholder names
+      const docBlockRegex = /(match\s+\/databases\/\{(?:db|database)\}\/documents\s*\{)([\s\S]*?)(\n\s*\})([\s\S]*?\n\s*\})?/m;
       const genDocBlockMatch = generated.match(docBlockRegex);
       const genDocContent = genDocBlockMatch ? genDocBlockMatch[2] : '';
       if (!genDocContent) return generated;
 
       const existingMatch = existing.match(docBlockRegex);
       if (!existingMatch) {
-        return existing.trimEnd() + `\n\n// --- APIFLOW GENERATED RULES BLOCK START ---\n` + generated + `\n// --- APIFLOW GENERATED RULES BLOCK END ---`;
+        // Instead of appending full generated (which would duplicate rules_version) try appending only document block contents
+        const generatedOnlyDocuments = genDocBlockMatch ? genDocBlockMatch[1] + genDocBlockMatch[2] + genDocBlockMatch[3] : generated;
+        const appended = existing.trimEnd() + `\n\n// --- APIFLOW GENERATED RULES BLOCK START ---\n` + generatedOnlyDocuments + `\n// --- APIFLOW GENERATED RULES BLOCK END ---`;
+        return dedupeRulesVersion(appended);
       }
       const existingDocContent = existingMatch[2];
       const wantedLines = genDocContent
@@ -77,13 +81,27 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
         const trimmedContent = content.endsWith('\n') ? content : content + '\n';
         return start + trimmedContent + injectionBlock + '\n' + close + (rest || '');
       });
-      return rebuilt;
+      return dedupeRulesVersion(rebuilt);
     } catch {
       return generated;
     }
   }
 
   const mergedRules = mergeRules(existingRules, ruleBody);
+
+  function dedupeRulesVersion(source: string): string {
+    const lines = source.split('\n');
+    let seen = false;
+    const out: string[] = [];
+    for (const line of lines) {
+      if (line.trim().startsWith('rules_version')) {
+        if (seen) continue; // skip duplicates
+        seen = true;
+      }
+      out.push(line);
+    }
+    return out.join('\n');
+  }
 
   return (
     <div className="space-y-4 bg-white border border-gray-200 rounded-lg p-4">
