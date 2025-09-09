@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Database, Plus, Trash2, TestTube, CheckCircle, XCircle, Loader } from 'lucide-react';
-import { FirestoreRulesHelper } from './FirestoreRulesHelper';
 import { DatabaseManager } from '../utils/database';
 import { SupabaseService } from '../utils/supabase-service';
 
@@ -412,10 +411,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
           ))
         )}
       </div>
-      {/* Firestore Rules Helper (only show if a firebase connection is present) */}
-      {databases.some(db => db.type === 'firebase') && (
-        <FirestoreRulesHelper />
-      )}
+  {/* Firestore rules helper moved to Schema Explorer */}
     </div>
   );
 }

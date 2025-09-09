@@ -21,6 +21,10 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const [expandedCells, setExpandedCells] = useState<Record<string, boolean>>({});
   const [showRulesHelper, setShowRulesHelper] = useState(false);
   const [rulesTarget, setRulesTarget] = useState<string | string[] | null>(null);
+  const [showInlineRules, setShowInlineRules] = useState(false);
+  const [existingRulesInput, setExistingRulesInput] = useState('');
+  const [generatedRules, setGeneratedRules] = useState('');
+  const [isGeneratingRules, setIsGeneratingRules] = useState(false);
 
   const toggleCell = (rowIndex: number, key: string) => {
     const id = `${rowIndex}-${key}`;
@@ -35,6 +39,61 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const openRulesHelper = (collection: string | string[]) => {
     setRulesTarget(collection);
     setShowRulesHelper(true);
+  };
+
+  const buildCanonicalRules = (ownerCollections: string[], openWrite: string[], readOnly: string[], pub: string[], placeholder: string) => {
+    return [
+      "rules_version = '2';",
+      'service cloud.firestore {',
+      `  match /databases/${placeholder}/documents {`,
+      '    function authed() { return request.auth != null; }',
+      '    function isOwner() { return authed() && request.auth.uid == resource.data.userId; }',
+      '    function creatingOwn() { return authed() && request.resource.data.userId != null && request.auth.uid == request.resource.data.userId; }',
+      '',
+      ...ownerCollections.map(c => `    match /${c}/{doc} {\n      allow create: if creatingOwn();\n      allow read, update, delete: if isOwner();\n    }`),
+      '',
+      ...openWrite.map(c => `    match /${c}/{doc} {\n      allow read: if authed();\n      allow create, update, delete: if true; // TODO tighten\n    }`),
+      '',
+      ...readOnly.map(c => `    match /${c}/{doc} { allow read: if authed(); }`),
+      '',
+      ...pub.map(c => `    match /${c}/{doc} { allow read: if true; }`),
+      '',
+      '    match /{document=**} {',
+      '      allow read, write: if false;',
+      '    }',
+      '  }',
+      '}'
+    ].join('\n');
+  };
+
+  const generateMergedRules = () => {
+    setIsGeneratingRules(true);
+    try {
+      const placeholder = /\/databases\/\{database\}\//.test(existingRulesInput) ? '{database}' : '{db}';
+      const existingLower = existingRulesInput.toLowerCase();
+      // Basic heuristic classification
+      const ownerCandidates = ['classes','recordings','studyplans','notes'];
+      const openWriteCandidates = ['transcripts','lectures'];
+      const readOnlyCandidates = ['mail','licenses','payments','users'];
+      const publicCandidates = ['public'];
+      // Include known collections even if absent
+      const ensureList = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+      const owner = ensureList(ownerCandidates.filter(c => existingLower.includes(`/${c}/`))); // start with those present
+      const openWrite = ensureList(openWriteCandidates.filter(c => existingLower.includes(`/${c}/`)));
+      const readOnly = ensureList(readOnlyCandidates);
+      const pub = ensureList(publicCandidates);
+      // Add any denied tables currently selected (permissionDenied) into read list automatically
+      const deniedTables = tables.filter(t => t.meta?.permissionDenied).map(t => t.name);
+      deniedTables.forEach(n => {
+        if (![...owner, ...openWrite, ...readOnly, ...pub].includes(n)) {
+          readOnly.push(n);
+        }
+      });
+      const canonical = buildCanonicalRules(owner, openWrite, readOnly, pub, placeholder);
+      setGeneratedRules(canonical);
+    } finally {
+      setIsGeneratingRules(false);
+    }
   };
 
   useEffect(() => {
@@ -112,6 +171,12 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           <h1 className="text-2xl font-bold text-gray-900">Schema Explorer</h1>
           <p className="text-gray-600">Explore your database structure and data</p>
         </div>
+        {databases.some(d => d.type === 'firebase') && (
+          <button
+            onClick={() => setShowInlineRules(prev => !prev)}
+            className="px-3 py-2 text-sm rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50"
+          >{showInlineRules ? 'Hide Rules Generator' : 'Show Rules Generator'}</button>
+        )}
         
         <div className="flex items-center space-x-3">
           <select
@@ -150,6 +215,51 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           </button>
         </div>
       </div>
+      {showInlineRules && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800 text-sm">Firestore Rules Assistant</h3>
+            <button onClick={() => setShowInlineRules(false)} className="text-gray-500 hover:text-gray-700 text-xs">✕</button>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">Paste Your Current Rules</label>
+              <textarea
+                className="w-full h-40 text-xs font-mono p-2 border rounded border-gray-300"
+                placeholder="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents { ... }\n}"
+                value={existingRulesInput}
+                onChange={e => setExistingRulesInput(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={generateMergedRules}
+                disabled={isGeneratingRules}
+                className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >{isGeneratingRules ? 'Generating...' : 'Generate Updated Rules'}</button>
+              {generatedRules && (
+                <button
+                  onClick={() => navigator.clipboard.writeText(generatedRules)}
+                  className="text-xs text-blue-600 hover:underline"
+                >Copy Output</button>
+              )}
+            </div>
+            {generatedRules && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center justify-between">
+                  <span>Updated Rules (replace existing)</span>
+                  <button
+                    onClick={() => { setGeneratedRules(''); setExistingRulesInput(''); }}
+                    className="text-[10px] text-gray-500 hover:text-gray-700"
+                  >Reset</button>
+                </label>
+                <pre className="text-[11px] bg-gray-900 text-green-200 p-3 rounded max-h-72 overflow-auto whitespace-pre">{generatedRules}</pre>
+                <p className="text-[10px] text-gray-500">Publish these in Firebase console, then click Refresh to re-scan collections.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tables List */}
