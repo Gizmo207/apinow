@@ -18,6 +18,12 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const [tableData, setTableData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedCells, setExpandedCells] = useState<Record<string, boolean>>({});
+
+  const toggleCell = (rowIndex: number, key: string) => {
+    const id = `${rowIndex}-${key}`;
+    setExpandedCells(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   useEffect(() => {
     if (databases.length > 0 && !selectedDatabase) {
@@ -282,11 +288,35 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
                       <tbody>
                         {tableData.slice(0, 5).map((row, index) => (
                           <tr key={index} className="border-b border-gray-100">
-                            {Object.values(row).map((value: any, cellIndex) => (
-                              <td key={cellIndex} className="py-2 px-3 text-gray-600">
-                                {value !== null ? String(value) : <span className="text-gray-400 italic">null</span>}
-                              </td>
-                            ))}
+                            {Object.entries(row).map(([key, value]: any, cellIndex) => {
+                              const cellId = `${index}-${key}`;
+                              const isObj = value && typeof value === 'object';
+                              const isExpanded = expandedCells[cellId];
+                              return (
+                                <td key={cellIndex} className="py-2 px-3 text-gray-600 align-top">
+                                  {value === null ? (
+                                    <span className="text-gray-400 italic">null</span>
+                                  ) : isObj ? (
+                                    <div className="text-xs font-mono">
+                                      <button
+                                        onClick={() => toggleCell(index, key)}
+                                        className="text-blue-600 hover:underline mr-2"
+                                        title={isExpanded ? 'Collapse' : 'Expand'}
+                                      >
+                                        {isExpanded ? '−' : '+'}
+                                      </button>
+                                      {isExpanded ? (
+                                        <pre className="whitespace-pre-wrap break-all max-h-40 overflow-auto bg-gray-50 p-2 rounded border border-gray-200">{JSON.stringify(value, null, 2)}</pre>
+                                      ) : (
+                                        <code className="bg-gray-100 px-1 py-0.5 rounded">{Array.isArray(value) ? `Array(${value.length})` : 'Object'}</code>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    String(value)
+                                  )}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>

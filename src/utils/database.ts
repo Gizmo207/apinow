@@ -49,12 +49,20 @@ export const FIREBASE_KNOWN_COLLECTIONS = [
 export class DatabaseManager {
   private connections: Map<string, any> = new Map();
   private static instance: DatabaseManager;
+  private additionalFirestoreCollections: Set<string> = new Set();
 
   static getInstance(): DatabaseManager {
     if (!DatabaseManager.instance) {
       DatabaseManager.instance = new DatabaseManager();
     }
     return DatabaseManager.instance;
+  }
+
+  /**
+   * Allow UI to register additional Firestore collection names to probe.
+   */
+  setAdditionalFirestoreCollections(cols: string[]) {
+    cols.filter(Boolean).forEach(c => this.additionalFirestoreCollections.add(c.trim()))
   }
 
   async testConnection(config: Omit<DatabaseConnection, 'id' | 'status' | 'tables' | 'createdAt'>): Promise<{ success: boolean; message: string }> {
@@ -422,8 +430,11 @@ export class DatabaseManager {
       const { db } = connection;
       const tables: DatabaseTable[] = [];
 
-  // Only check collections we know exist / recommend
-  const knownCollections = FIREBASE_KNOWN_COLLECTIONS;
+      // Merge base + additional user-provided collections
+      const knownCollections = Array.from(new Set([
+        ...FIREBASE_KNOWN_COLLECTIONS,
+        ...this.additionalFirestoreCollections
+      ]));
 
   const permissionDenied: string[] = [];
   for (const collectionName of knownCollections) {

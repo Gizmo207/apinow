@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FIREBASE_KNOWN_COLLECTIONS } from '../utils/database';
+import { useState, useEffect } from 'react';
+import { FIREBASE_KNOWN_COLLECTIONS, DatabaseManager } from '../utils/database';
 
 interface FirestoreRulesHelperProps {
   collections?: string[];
@@ -12,6 +12,17 @@ interface FirestoreRulesHelperProps {
 export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps) {
   const [mode, setMode] = useState<'readonly' | 'owner' | 'open-dev'>('readonly');
   const [customCollections, setCustomCollections] = useState<string>('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('apiflow_fire_custom_cols');
+    if (saved) setCustomCollections(saved);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('apiflow_fire_custom_cols', customCollections);
+    const arr = customCollections.split(',').map(c => c.trim()).filter(Boolean);
+    DatabaseManager.getInstance().setAdditionalFirestoreCollections(arr);
+  }, [customCollections]);
 
   const list = (collections && collections.length ? collections : FIREBASE_KNOWN_COLLECTIONS)
     .concat(customCollections.split(',').map(c => c.trim()).filter(Boolean))
@@ -31,7 +42,10 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
   return (
     <div className="space-y-4 bg-white border border-gray-200 rounded-lg p-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900 text-sm">Firestore Rules Generator</h3>
+        <h3 className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
+          <span>Firestore Rules Generator</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Generate copy/paste security rules">beta</span>
+        </h3>
         <select
           className="text-sm border-gray-300 rounded"
           value={mode}
@@ -44,7 +58,10 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
         </select>
       </div>
       <div className="space-y-2">
-        <label className="text-xs text-gray-600">Extra Collections (comma separated)</label>
+        <label className="text-xs text-gray-600 flex items-center justify-between">
+          <span>Extra Collections (comma separated)</span>
+          <span className="text-[10px] text-gray-400" title="These will be probed during introspection">used in scan</span>
+        </label>
         <input
           className="w-full text-sm px-2 py-1 border rounded border-gray-300"
           placeholder="extraCollection,anotherOne"
