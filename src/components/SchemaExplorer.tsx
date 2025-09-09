@@ -84,13 +84,18 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       const pub = ensureList(publicCandidates);
       // Add any denied tables currently selected (permissionDenied) into read list automatically
       const deniedTables = tables.filter(t => t.meta?.permissionDenied).map(t => t.name);
+      const newlyAdded: string[] = [];
       deniedTables.forEach(n => {
         if (![...owner, ...openWrite, ...readOnly, ...pub].includes(n)) {
           readOnly.push(n);
+          newlyAdded.push(n);
         }
       });
       const canonical = buildCanonicalRules(owner, openWrite, readOnly, pub, placeholder);
-      setGeneratedRules(canonical);
+      const annotated = newlyAdded.length
+        ? canonical + '\n\n// Added read access for newly detected denied collections: ' + newlyAdded.join(', ')
+        : canonical;
+      setGeneratedRules(annotated);
     } finally {
       setIsGeneratingRules(false);
     }
