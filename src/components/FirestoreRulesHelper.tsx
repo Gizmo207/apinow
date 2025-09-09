@@ -89,6 +89,50 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
 
   const mergedRules = mergeRules(existingRules, ruleBody);
 
+  // Validation + reconstruction fallback to prevent malformed multiple service blocks.
+  function needsReconstruct(content: string): boolean {
+    const serviceCount = (content.match(/service\s+cloud\.firestore/g) || []).length;
+    if (serviceCount > 1) return true;
+    if (/--- APIFLOW GENERATED RULES BLOCK START ---/.test(content)) return true;
+    if (/^\s*\d+\s*$/m.test(content)) return true; // stray numeric lines
+    if (/APIFLOW injected rules START/.test(content) && /service\s+cloud\.firestore[\s\S]+service\s+cloud\.firestore/.test(content)) return true;
+    return false;
+  }
+
+  function reconstructRules(existing: string, placeholder: string): string {
+    // Determine placeholder style
+    const ph = /\/databases\/\{database\}\//.test(existing) ? '{database}' : placeholder;
+    const ownerCollections = ['classes','recordings','studyPlans','notes'];
+    const openWriteCollections = ['transcripts','lectures'];
+    const readOnlyCollections = ['mail','licenses','payments','users'];
+    const publicCollections = ['public'];
+
+    return [
+      "rules_version = '2';",
+      'service cloud.firestore {',
+      `  match /databases/${ph}/documents {`,
+      '    function authed() { return request.auth != null; }',
+      '    function isOwner() { return authed() && request.auth.uid == resource.data.userId; }',
+      '    function creatingOwn() { return authed() && request.resource.data.userId != null && request.auth.uid == request.resource.data.userId; }',
+      '',
+      ...ownerCollections.map(c => `    match /${c}/{doc} {\n      allow create: if creatingOwn();\n      allow read, update, delete: if isOwner();\n    }`),
+      '',
+      ...openWriteCollections.map(c => `    match /${c}/{doc} {\n      allow read: if authed();\n      allow create, update, delete: if true;\n    }`),
+      '',
+      ...readOnlyCollections.map(c => `    match /${c}/{doc} { allow read: if authed(); }`),
+      '',
+      ...publicCollections.map(c => `    match /${c}/{doc} { allow read: if true; }`),
+      '',
+      '    match /{document=**} {',
+      '      allow read, write: if false;',
+      '    }',
+      '  }',
+      '}'
+    ].join('\n');
+  }
+
+  const finalRules = needsReconstruct(mergedRules) ? reconstructRules(existingRules, '{db}') : mergedRules;
+
   function dedupeRulesVersion(source: string): string {
     const lines = source.split('\n');
     let seen = false;
@@ -159,16 +203,16 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
           aria-label="Generated mode rules snippet"
         />
         <label className="text-xs text-gray-600 flex items-center justify-between mt-3">
-          <span>Merged Output (final)</span>
-          <button onClick={() => navigator.clipboard.writeText(mergedRules)} className="text-blue-600 hover:text-blue-700 text-xs" type="button">Copy</button>
+          <span>{needsReconstruct(mergedRules) ? 'Reconstructed Output (final)' : 'Merged Output (final)'}</span>
+          <button onClick={() => navigator.clipboard.writeText(finalRules)} className="text-blue-600 hover:text-blue-700 text-xs" type="button">Copy</button>
         </label>
         <textarea
           className="w-full h-56 text-xs font-mono p-2 border border-gray-300 rounded resize-none"
-          value={mergedRules}
+          value={finalRules}
           readOnly
-          aria-label="Merged Firestore rules"
+          aria-label="Final Firestore rules"
         />
-        <p className="text-[11px] text-gray-500">Paste the merged output into the Firebase console. If merge fails, we fallback to full replacement snippet. Adjust expiry date for dev mode.</p>
+        <p className="text-[11px] text-gray-500">{needsReconstruct(mergedRules) ? 'Auto-reconstructed to avoid duplicate service blocks.' : 'Merged non-destructively.'} Review before publishing.</p>
       </div>
     </div>
   );
