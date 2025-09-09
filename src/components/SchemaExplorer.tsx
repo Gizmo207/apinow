@@ -19,10 +19,19 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCells, setExpandedCells] = useState<Record<string, boolean>>({});
+  const [showRulesHelper, setShowRulesHelper] = useState(false);
+  const [rulesTarget, setRulesTarget] = useState<string | null>(null);
 
   const toggleCell = (rowIndex: number, key: string) => {
     const id = `${rowIndex}-${key}`;
     setExpandedCells(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const generateRuleSnippet = (collection: string) => `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /${collection}/{doc} {\n      // Temporary: allow authenticated users to read documents in ${collection}\n      allow read: if request.auth != null;\n      // Restrict writes to owner pattern if documents store userId\n      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;\n      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;\n    }\n  }\n}`;
+
+  const openRulesHelper = (collection: string) => {
+    setRulesTarget(collection);
+    setShowRulesHelper(true);
   };
 
   useEffect(() => {
@@ -213,12 +222,21 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
               {/* Table Info */}
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
-                    <span>{selectedTable.name}</span>
+                  <div className="flex items-center space-x-3">
+                    <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                      <span>{selectedTable.name}</span>
+                      {selectedTable.meta?.permissionDenied && (
+                        <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded">PERMISSION DENIED</span>
+                      )}
+                    </h2>
                     {selectedTable.meta?.permissionDenied && (
-                      <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded">PERMISSION DENIED</span>
+                      <button
+                        onClick={() => openRulesHelper(selectedTable.name)}
+                        className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        title="Generate Firestore rule snippet"
+                      >Fix Rules</button>
                     )}
-                  </h2>
+                  </div>
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
                     <span>{selectedTable.columns.length} columns</span>
                     <span>{selectedTable.rowCount} rows</span>
@@ -344,6 +362,35 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           )}
         </div>
       </div>
+      {showRulesHelper && rulesTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900 text-sm">Firestore Rule Snippet for <span className="text-blue-600">{rulesTarget}</span></h3>
+              <button
+                onClick={() => setShowRulesHelper(false)}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+                aria-label="Close"
+              >✕</button>
+            </div>
+            <p className="text-xs text-gray-600">Add this to your Firestore rules to allow the app to read the collection and enforce basic ownership.</p>
+            <div className="relative">
+              <button
+                onClick={() => rulesTarget && navigator.clipboard.writeText(generateRuleSnippet(rulesTarget))}
+                className="absolute top-2 right-2 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+              >Copy</button>
+              <pre className="text-[11px] bg-gray-900 text-green-200 p-3 rounded overflow-auto max-h-72 whitespace-pre">{rulesTarget ? generateRuleSnippet(rulesTarget) : ''}</pre>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-gray-500">
+              <span>After updating rules, click Refresh to re-scan.</span>
+              <button
+                onClick={() => { setShowRulesHelper(false); loadDatabaseSchema(); }}
+                className="text-blue-600 hover:underline"
+              >Reload Schema</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
