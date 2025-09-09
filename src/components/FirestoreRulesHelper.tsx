@@ -12,10 +12,13 @@ interface FirestoreRulesHelperProps {
 export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps) {
   const [mode, setMode] = useState<'readonly' | 'owner' | 'open-dev'>('readonly');
   const [customCollections, setCustomCollections] = useState<string>('');
+  const [existingRules, setExistingRules] = useState<string>('');
 
   useEffect(() => {
     const saved = localStorage.getItem('apiflow_fire_custom_cols');
     if (saved) setCustomCollections(saved);
+  const savedExisting = localStorage.getItem('apiflow_fire_existing_rules');
+  if (savedExisting) setExistingRules(savedExisting);
   }, []);
 
   useEffect(() => {
@@ -23,6 +26,10 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
     const arr = customCollections.split(',').map(c => c.trim()).filter(Boolean);
     DatabaseManager.getInstance().setAdditionalFirestoreCollections(arr);
   }, [customCollections]);
+
+  useEffect(() => {
+    localStorage.setItem('apiflow_fire_existing_rules', existingRules);
+  }, [existingRules]);
 
   const list = (collections && collections.length ? collections : FIREBASE_KNOWN_COLLECTIONS)
     .concat(customCollections.split(',').map(c => c.trim()).filter(Boolean))
@@ -38,6 +45,45 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
     // owner mode
     return `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    function authed() { return request.auth != null; }\n    function own() { return authed() && request.auth.uid == resource.data.userId; }\n    function createOwn() { return authed() && request.auth.uid == request.resource.data.userId; }\n${list.map(c => `    match /${c}/{doc} {\n      allow create: if createOwn();\n      allow read, update, delete: if own();\n    }`).join('\n')}\n  }\n}`;
   })();
+
+  function mergeRules(existing: string, generated: string): string {
+    if (!existing.trim()) return generated;
+    try {
+      const docBlockRegex = /(match\s+\/databases\/\{db\}\/documents\s*\{)([\s\S]*?)(\n\s*\})([\s\S]*?\n\s*\})?/m;
+      const genDocBlockMatch = generated.match(docBlockRegex);
+      const genDocContent = genDocBlockMatch ? genDocBlockMatch[2] : '';
+      if (!genDocContent) return generated;
+
+      const existingMatch = existing.match(docBlockRegex);
+      if (!existingMatch) {
+        return existing.trimEnd() + `\n\n// --- APIFLOW GENERATED RULES BLOCK START ---\n` + generated + `\n// --- APIFLOW GENERATED RULES BLOCK END ---`;
+      }
+      const existingDocContent = existingMatch[2];
+      const wantedLines = genDocContent
+        .split('\n')
+        .map(l => l.replace(/\s+$/,''))
+        .filter(l => /^(\s*function\s+\w+\(|\s*match\s+\/)/.test(l));
+      const existingLower = existingDocContent.toLowerCase();
+      const newInsertLines: string[] = [];
+      for (const line of wantedLines) {
+        const normalized = line.trim().toLowerCase();
+        if (!existingLower.includes(normalized)) newInsertLines.push(line);
+      }
+      if (!newInsertLines.length) return existing;
+      const insertionCommentStart = '    // ---- APIFLOW injected rules START ----';
+      const insertionCommentEnd = '    // ---- APIFLOW injected rules END ----';
+      const injectionBlock = [insertionCommentStart, ...newInsertLines, insertionCommentEnd].join('\n');
+      const rebuilt = existing.replace(docBlockRegex, (_m, start, content, close, rest) => {
+        const trimmedContent = content.endsWith('\n') ? content : content + '\n';
+        return start + trimmedContent + injectionBlock + '\n' + close + (rest || '');
+      });
+      return rebuilt;
+    } catch {
+      return generated;
+    }
+  }
+
+  const mergedRules = mergeRules(existingRules, ruleBody);
 
   return (
     <div className="space-y-4 bg-white border border-gray-200 rounded-lg p-4">
@@ -71,20 +117,40 @@ export function FirestoreRulesHelper({ collections }: FirestoreRulesHelperProps)
       </div>
       <div className="space-y-2">
         <label className="text-xs text-gray-600 flex items-center justify-between">
-          <span>Generated Rules</span>
-          <button
-            onClick={() => navigator.clipboard.writeText(ruleBody)}
-            className="text-blue-600 hover:text-blue-700 text-xs"
-            type="button"
-          >Copy</button>
+          <span>Your Current Rules (paste here - optional)</span>
+          <button type="button" className="text-[10px] text-blue-600 hover:text-blue-700" onClick={() => setExistingRules('')}>Clear</button>
+        </label>
+        <textarea
+          className="w-full h-40 text-xs font-mono p-2 border border-gray-300 rounded"
+          placeholder="Paste your existing rules_version ... here"
+          value={existingRules}
+          onChange={e => setExistingRules(e.target.value)}
+          aria-label="Existing Firestore rules"
+        />
+        <p className="text-[10px] text-gray-500">We'll attempt a non-destructive merge: only new match blocks & helpers added.</p>
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs text-gray-600 flex items-center justify-between">
+          <span>Mode Snippet</span>
+          <button onClick={() => navigator.clipboard.writeText(ruleBody)} className="text-blue-600 hover:text-blue-700 text-xs" type="button">Copy</button>
+        </label>
+        <textarea
+          className="w-full h-40 text-xs font-mono p-2 border border-gray-300 rounded resize-none"
+          value={ruleBody}
+          readOnly
+          aria-label="Generated mode rules snippet"
+        />
+        <label className="text-xs text-gray-600 flex items-center justify-between mt-3">
+          <span>Merged Output (final)</span>
+          <button onClick={() => navigator.clipboard.writeText(mergedRules)} className="text-blue-600 hover:text-blue-700 text-xs" type="button">Copy</button>
         </label>
         <textarea
           className="w-full h-56 text-xs font-mono p-2 border border-gray-300 rounded resize-none"
-          value={ruleBody}
+          value={mergedRules}
           readOnly
-          aria-label="Generated Firestore rules"
+          aria-label="Merged Firestore rules"
         />
-        <p className="text-[11px] text-gray-500">Paste into Firestore Rules in the Firebase console. Adjust expiry date for dev mode.</p>
+        <p className="text-[11px] text-gray-500">Paste the merged output into the Firebase console. If merge fails, we fallback to full replacement snippet. Adjust expiry date for dev mode.</p>
       </div>
     </div>
   );
