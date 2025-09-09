@@ -1,0 +1,303 @@
+import React, { useState } from 'react';
+import { Settings as SettingsIcon, Key, Shield, Bell, User } from 'lucide-react';
+
+export function Settings() {
+  const [activeTab, setActiveTab] = useState('general');
+
+  const tabs = [
+    { id: 'general', label: 'General', icon: SettingsIcon },
+    { id: 'api-keys', label: 'API Keys', icon: Key },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'account', label: 'Account', icon: User },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="text-gray-600">Manage your account and API configuration</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Settings Navigation */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <nav className="space-y-1">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                <span className="font-medium">{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Settings Content */}
+        <div className="lg:col-span-3 bg-white rounded-lg border border-gray-200 p-6">
+          {activeTab === 'general' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">General Settings</h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Organization Name
+                    </label>
+                    <input
+                      type="text"
+                      defaultValue="Acme Corp"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Default Rate Limit
+                    </label>
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                      <option>100 requests/minute</option>
+                      <option>500 requests/minute</option>
+                      <option>1000 requests/minute</option>
+                      <option>Unlimited</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Default Authentication
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input type="radio" name="auth" value="required" defaultChecked className="mr-2" />
+                        <span>Require API key for all endpoints</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input type="radio" name="auth" value="optional" className="mr-2" />
+                        <span>Make API key optional</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input type="radio" name="auth" value="none" className="mr-2" />
+                        <span>No authentication required</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'api-keys' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">API Keys</h2>
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                  Generate New Key
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { name: 'Production Key', key: 'pk_live_xxxxxxxxxxxxxxxx', created: '2024-01-15', lastUsed: '2 minutes ago' },
+                  { name: 'Development Key', key: 'pk_test_xxxxxxxxxxxxxxxx', created: '2024-01-10', lastUsed: '1 hour ago' }
+                ].map((apiKey, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{apiKey.name}</h3>
+                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded mt-1 inline-block">
+                          {apiKey.key}
+                        </code>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button className="text-blue-600 hover:text-blue-700 text-sm">Copy</button>
+                        <button className="text-red-600 hover:text-red-700 text-sm">Revoke</button>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-sm text-gray-500">
+                      <span>Created: {apiKey.created}</span>
+                      <span className="mx-2">•</span>
+                      <span>Last used: {apiKey.lastUsed}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <h2 className="text-lg font-semibold text-gray-900">Security Settings</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-3">IP Whitelisting</h3>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-900">Restrict API access to specific IP addresses</p>
+                    </div>
+                    <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200">
+                      <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-3">CORS Settings</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Allowed Origins
+                      </label>
+                      <input
+                        type="text"
+                        defaultValue="*"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="https://example.com, https://app.example.com"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-500">Use * to allow all origins (not recommended for production)</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-3">SSL/TLS</h3>
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-green-900">Force HTTPS for all API endpoints</p>
+                      <p className="text-xs text-green-700">All connections are automatically encrypted</p>
+                    </div>
+                    <div className="bg-green-500 h-6 w-11 rounded-full flex items-center justify-end px-1">
+                      <span className="h-4 w-4 bg-white rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-6">
+              <h2 className="text-lg font-semibold text-gray-900">Notification Preferences</h2>
+              
+              <div className="space-y-4">
+                {[
+                  { title: 'API Usage Alerts', description: 'Get notified when approaching rate limits', enabled: true },
+                  { title: 'Downtime Alerts', description: 'Immediate alerts for API outages', enabled: true },
+                  { title: 'Security Alerts', description: 'Notifications for unauthorized access attempts', enabled: true },
+                  { title: 'Weekly Reports', description: 'Weekly API usage and performance summaries', enabled: false }
+                ].map((notification, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{notification.title}</h3>
+                      <p className="text-sm text-gray-600">{notification.description}</p>
+                    </div>
+                    <button 
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        notification.enabled ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        notification.enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'account' && (
+            <div className="space-y-6">
+              <h2 className="text-lg font-semibold text-gray-900">Account Settings</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">Profile Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        defaultValue="John"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        defaultValue="Doe"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      defaultValue="john@company.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">Current Plan</h3>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Pro Plan</h4>
+                        <p className="text-sm text-gray-600">Unlimited APIs, advanced features</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-gray-900">$49</p>
+                        <p className="text-sm text-gray-500">/month</p>
+                      </div>
+                    </div>
+                    <button className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium">
+                      Manage Subscription
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">Danger Zone</h3>
+                  <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+                    <h4 className="font-medium text-red-900">Delete Account</h4>
+                    <p className="text-sm text-red-700 mb-3">
+                      This will permanently delete your account and all associated data. This action cannot be undone.
+                    </p>
+                    <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-6 border-t border-gray-200">
+            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

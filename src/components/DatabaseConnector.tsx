@@ -1,0 +1,421 @@
+import React, { useState } from 'react';
+import { Database, Plus, Trash2, TestTube, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { FirestoreRulesHelper } from './FirestoreRulesHelper';
+import { DatabaseManager } from '../utils/database';
+import { SupabaseService } from '../utils/supabase-service';
+
+interface DatabaseConnectorProps {
+  databases: any[];
+  onDatabasesChange: (databases: any[]) => void;
+}
+
+export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConnectorProps) {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
+    host: '',
+    port: '',
+    database: '',
+    username: '',
+    password: '',
+    projectId: '',
+    apiKey: '',
+    authDomain: ''
+  });
+  const [testingConnection, setTestingConnection] = useState<string | null>(null);
+  const [connectionResults, setConnectionResults] = useState<{ [key: string]: 'success' | 'error' | null }>({});
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Test connection first
+    setTestingConnection('new');
+    try {
+      const dbManager = DatabaseManager.getInstance();
+      
+      // Create temporary connection object for testing
+      const tempConnection = {
+        id: 'temp',
+        ...formData,
+        connected: false,
+        createdAt: new Date().toISOString()
+      };
+      
+      await dbManager.testConnection(tempConnection);
+      
+      // Connection successful, save to Supabase
+      const supabaseService = SupabaseService.getInstance();
+      const savedConnection = await supabaseService.saveConnection(formData);
+      
+      // Convert Supabase format to local format
+      const newDatabase = {
+        id: savedConnection.id,
+        name: savedConnection.name,
+        type: savedConnection.type,
+        host: savedConnection.host,
+        port: savedConnection.port,
+        database: savedConnection.database_name,
+        username: savedConnection.username,
+        password: savedConnection.encrypted_password,
+        projectId: savedConnection.project_id,
+        apiKey: savedConnection.api_key,
+        authDomain: savedConnection.auth_domain,
+        connected: true,
+        createdAt: savedConnection.created_at
+      };
+      
+      setConnectionResults(prev => ({ ...prev, [newDatabase.id]: 'success' }));
+      onDatabasesChange([...databases, newDatabase]);
+      setShowAddForm(false);
+      setFormData({
+        name: '',
+        type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
+        host: '',
+        port: '',
+        database: '',
+        username: '',
+        password: '',
+        projectId: '',
+        apiKey: '',
+        authDomain: ''
+      });
+    } catch (error) {
+      setConnectionResults(prev => ({ ...prev, ['new']: 'error' }));
+      console.error('Connection failed:', error);
+    } finally {
+      setTestingConnection(null);
+    }
+  };
+
+  const handleTestConnection = async (database: any) => {
+    setTestingConnection(database.id);
+    try {
+      const dbManager = DatabaseManager.getInstance();
+      await dbManager.testConnection(database);
+      setConnectionResults(prev => ({ ...prev, [database.id]: 'success' }));
+      
+      // Update database status
+      const updatedDatabases = databases.map(db => 
+        db.id === database.id ? { ...db, connected: true } : db
+      );
+      onDatabasesChange(updatedDatabases);
+    } catch (error) {
+      setConnectionResults(prev => ({ ...prev, [database.id]: 'error' }));
+      console.error('Connection test failed:', error);
+    } finally {
+      setTestingConnection(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const supabaseService = SupabaseService.getInstance();
+      await supabaseService.deleteConnection(id);
+      
+      onDatabasesChange(databases.filter(db => db.id !== id));
+      setConnectionResults(prev => {
+        const newResults = { ...prev };
+        delete newResults[id];
+        return newResults;
+      });
+    } catch (error) {
+      console.error('Failed to delete connection:', error);
+    }
+  };
+
+  const getConnectionStatus = (database: any) => {
+    if (testingConnection === database.id) {
+      return <Loader className="w-4 h-4 animate-spin text-blue-500" />;
+    }
+    
+    const result = connectionResults[database.id];
+    if (result === 'success') {
+      return <CheckCircle className="w-4 h-4 text-green-500" />;
+    } else if (result === 'error') {
+      return <XCircle className="w-4 h-4 text-red-500" />;
+    }
+    
+    return database.connected ? 
+      <CheckCircle className="w-4 h-4 text-green-500" /> : 
+      <XCircle className="w-4 h-4 text-gray-400" />;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Database Connections</h1>
+          <p className="text-gray-600 mt-1">Connect to your databases to start building APIs</p>
+        </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Database</span>
+        </button>
+      </div>
+
+      {showAddForm && (
+        <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <h3 className="text-lg font-semibold mb-4">Add New Database Connection</h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Connection Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="My Database"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Database Type
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as 'sqlite' | 'mysql' | 'postgresql' | 'firebase' }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  aria-label="Database Type"
+                >
+                  <option value="sqlite">SQLite</option>
+                  <option value="mysql">MySQL</option>
+                  <option value="postgresql">PostgreSQL</option>
+                  <option value="firebase">Firebase Firestore</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.type !== 'sqlite' && formData.type !== 'firebase' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Host
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.host}
+                    onChange={(e) => setFormData(prev => ({ ...prev, host: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="localhost"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Port
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.port}
+                    onChange={(e) => setFormData(prev => ({ ...prev, port: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="3306"
+                  />
+                </div>
+              </div>
+            )}
+
+            {formData.type === 'firebase' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.projectId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, projectId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="my-firebase-project"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    API Key
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.apiKey}
+                    onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="AIzaSyC..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Auth Domain (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.authDomain}
+                    onChange={(e) => setFormData(prev => ({ ...prev, authDomain: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="my-firebase-project.firebaseapp.com"
+                  />
+                </div>
+              </div>
+            )}
+
+            {formData.type !== 'sqlite' && formData.type !== 'firebase' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Database Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.database}
+                  onChange={(e) => setFormData(prev => ({ ...prev, database: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="my_database"
+                  required
+                />
+              </div>
+            )}
+
+            {formData.type === 'sqlite' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Database Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.database}
+                  onChange={(e) => setFormData(prev => ({ ...prev, database: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="database.db"
+                  required
+                />
+              </div>
+            )}
+
+            {formData.type !== 'sqlite' && formData.type !== 'firebase' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="password"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={testingConnection !== null}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {testingConnection ? 'Testing...' : 'Add Database'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        {databases.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+            <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No databases connected</h3>
+            <p className="text-gray-600 mb-4">Connect your first database to start building APIs</p>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Add Database
+            </button>
+          </div>
+        ) : (
+          databases.map(database => (
+            <div key={database.id} className="bg-white p-6 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Database className="w-8 h-8 text-blue-600" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{database.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      {database.type.toUpperCase()} • {database.database}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  {getConnectionStatus(database)}
+                  <button
+                    onClick={() => handleTestConnection(database)}
+                    disabled={testingConnection === database.id}
+                    className="flex items-center space-x-2 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  >
+                    <TestTube className="w-4 h-4" />
+                    <span>Test</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(database.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    aria-label={`Delete ${database.name} connection`}
+                    title="Delete Connection"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              
+              {connectionResults[database.id] === 'success' && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    ✅ Connection successful! Sample data has been created.
+                  </p>
+                </div>
+              )}
+              
+              {connectionResults[database.id] === 'error' && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">
+                    ❌ Connection failed. Please check your database settings.
+                  </p>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+      {/* Firestore Rules Helper (only show if a firebase connection is present) */}
+      {databases.some(db => db.type === 'firebase') && (
+        <FirestoreRulesHelper />
+      )}
+    </div>
+  );
+}
