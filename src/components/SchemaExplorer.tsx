@@ -20,16 +20,19 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCells, setExpandedCells] = useState<Record<string, boolean>>({});
   const [showRulesHelper, setShowRulesHelper] = useState(false);
-  const [rulesTarget, setRulesTarget] = useState<string | null>(null);
+  const [rulesTarget, setRulesTarget] = useState<string | string[] | null>(null);
 
   const toggleCell = (rowIndex: number, key: string) => {
     const id = `${rowIndex}-${key}`;
     setExpandedCells(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const generateRuleSnippet = (collection: string) => `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /${collection}/{doc} {\n      // Temporary: allow authenticated users to read documents in ${collection}\n      allow read: if request.auth != null;\n      // Restrict writes to owner pattern if documents store userId\n      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;\n      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;\n    }\n  }\n}`;
+  const generateRuleSnippet = (collection: string | string[]) => {
+    const collections = Array.isArray(collection) ? collection : [collection];
+    return `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n${collections.map(c => `    match /${c}/{doc} {\n      // Allow authenticated users to read '${c}' collection\n      allow read: if request.auth != null;\n      // Owner-based write protection (expects userId field)\n      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;\n      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;\n    }`).join('\n')}\n  }\n}`;
+  };
 
-  const openRulesHelper = (collection: string) => {
+  const openRulesHelper = (collection: string | string[]) => {
     setRulesTarget(collection);
     setShowRulesHelper(true);
   };
@@ -167,7 +170,26 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
             </div>
           </div>
           
-          <div className="p-4 max-h-96 overflow-y-auto">
+          <div className="p-4 max-h-[30rem] overflow-y-auto space-y-3">
+            {/* Permission Denied Banner */}
+            {filteredTables.some(t => t.meta?.permissionDenied) && (
+              <div className="border border-amber-300 bg-amber-50 text-amber-800 text-xs p-3 rounded flex items-start justify-between space-x-4">
+                <div className="space-y-1">
+                  <p className="font-medium">Firestore access restricted</p>
+                  <p className="leading-snug">We detected collections blocked by your Firestore security rules. Generate a rules snippet to enable read access (owner-safe writes).</p>
+                </div>
+                <div className="flex flex-col space-y-2">
+                  <button
+                    onClick={() => openRulesHelper(filteredTables.filter(t => t.meta?.permissionDenied).map(t => t.name))}
+                    className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-[11px]"
+                  >Fix All</button>
+                  <button
+                    onClick={() => loadDatabaseSchema()}
+                    className="px-2 py-1 bg-white border border-blue-600 text-blue-600 rounded hover:bg-blue-50 text-[11px]"
+                  >Rescan</button>
+                </div>
+              </div>
+            )}
             {loading ? (
               <div className="text-center py-4">
                 <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
@@ -366,7 +388,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 text-sm">Firestore Rule Snippet for <span className="text-blue-600">{rulesTarget}</span></h3>
+              <h3 className="font-semibold text-gray-900 text-sm">Firestore Rule Snippet {Array.isArray(rulesTarget) ? ' (Multiple Collections)' : <>for <span className="text-blue-600">{rulesTarget}</span></>}</h3>
               <button
                 onClick={() => setShowRulesHelper(false)}
                 className="text-gray-500 hover:text-gray-700 text-sm"
