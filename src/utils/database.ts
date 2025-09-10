@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, query, limit } from 'firebase/firestore';
+import FirebaseAuthService from '../lib/firebaseAuth';
 // Removed automatic Firebase import to prevent connection errors
 
 export interface DatabaseConnection {
@@ -427,7 +428,26 @@ export class DatabaseManager {
         throw new Error('Invalid Firebase configuration - missing required credentials');
       }
 
-      const { db } = connection;
+      // For connection-specific Firebase instances, we'll use the connection's auth instead of global auth
+      // The connection already has the API key from when the user connected
+      const { db, app } = connection;
+      
+      // Get auth instance for this specific connection
+      try {
+        const { getAuth, signInAnonymously } = await import('firebase/auth');
+        const auth = getAuth(app);
+        
+        // Check if already signed in
+        if (!auth.currentUser) {
+          console.log('Signing in anonymously for Firestore access...');
+          await signInAnonymously(auth);
+          console.log('Anonymous sign-in successful');
+        }
+      } catch (authError) {
+        console.warn('Anonymous auth failed, proceeding without auth:', authError);
+        // Continue without auth - some rules might still allow access
+      }
+
       const tables: DatabaseTable[] = [];
 
       // Merge base + additional user-provided collections
@@ -638,6 +658,11 @@ export class DatabaseManager {
       if (collectionName === 'no_collections_found') {
         return [];
       }
+
+      // Ensure authentication before making Firestore calls (fixes 400 Bad Request)
+      const authService = FirebaseAuthService.getInstance();
+      await authService.ensureAuthenticated();
+      
       // Get documents from the collection
       const snapshot = await getDocs(query(collection(db, collectionName), limit(limitCount)));
       

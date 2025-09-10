@@ -2,7 +2,7 @@
 // This file provides Firebase configuration management
 // Firebase apps are created dynamically only when needed with valid credentials
 
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 
 // Only initialize Firebase if we have actual environment variables
 const hasFirebaseConfig = !!(
@@ -24,7 +24,7 @@ const firebaseConfig = {
 };
 
 // Only initialize if we have real Firebase credentials
-let defaultApp;
+let defaultApp: FirebaseApp | undefined;
 if (hasFirebaseConfig && getApps().length === 0) {
   try {
     defaultApp = initializeApp(firebaseConfig, 'default-app');

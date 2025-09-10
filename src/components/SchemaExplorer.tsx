@@ -33,7 +33,8 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
 
   const generateRuleSnippet = (collection: string | string[]) => {
     const collections = Array.isArray(collection) ? collection : [collection];
-    return `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n${collections.map(c => `    match /${c}/{doc} {\n      // Allow authenticated users to read '${c}' collection\n      allow read: if request.auth != null;\n      // Owner-based write protection (expects userId field)\n      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;\n      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;\n    }`).join('\n')}\n  }\n}`;
+  // NOTE: Firestore requires the literal placeholder {database} in this path; {db} is invalid.
+  return `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n${collections.map(c => `    match /${c}/{doc} {\n      // Allow authenticated users to read '${c}' collection\n      allow read: if request.auth != null;\n      // Owner-based write protection (expects userId field)\n      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;\n      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;\n    }`).join('\n')}\n  }\n}`;
   };
 
   const openRulesHelper = (collection: string | string[]) => {
@@ -41,11 +42,12 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     setShowRulesHelper(true);
   };
 
-  const buildCanonicalRules = (ownerCollections: string[], openWrite: string[], readOnly: string[], pub: string[], placeholder: string) => {
+  const buildCanonicalRules = (ownerCollections: string[], openWrite: string[], readOnly: string[], pub: string[]) => {
     return [
       "rules_version = '2';",
       'service cloud.firestore {',
-      `  match /databases/${placeholder}/documents {`,
+      // Firestore spec requires {database} here; do not rename.
+      `  match /databases/{database}/documents {`,
       '    function authed() { return request.auth != null; }',
       '    function isOwner() { return authed() && request.auth.uid == resource.data.userId; }',
       '    function creatingOwn() { return authed() && request.resource.data.userId != null && request.auth.uid == request.resource.data.userId; }',
@@ -69,7 +71,6 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const generateMergedRules = () => {
     setIsGeneratingRules(true);
     try {
-      const placeholder = /\/databases\/\{database\}\//.test(existingRulesInput) ? '{database}' : '{db}';
       const existingLower = existingRulesInput.toLowerCase();
       // Basic heuristic classification
       const ownerCandidates = ['classes','recordings','studyplans','notes'];
@@ -91,7 +92,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           newlyAdded.push(n);
         }
       });
-      const canonical = buildCanonicalRules(owner, openWrite, readOnly, pub, placeholder);
+  const canonical = buildCanonicalRules(owner, openWrite, readOnly, pub);
       const annotated = newlyAdded.length
         ? canonical + '\n\n// Added read access for newly detected denied collections: ' + newlyAdded.join(', ')
         : canonical;
