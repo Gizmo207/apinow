@@ -1,4 +1,4 @@
-export type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'tester' | 'docs' | 'analytics' | 'settings';
+export type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'unified' | 'tester' | 'docs' | 'analytics' | 'settings';
 
 export interface User {
   id: string;

@@ -14,6 +14,12 @@ export interface SupabaseConnection {
   project_id?: string;
   api_key?: string;
   auth_domain?: string;
+  // Firebase Admin SDK fields
+  service_account_key?: string;
+  admin_api_key?: string;
+  admin_auth_domain?: string;
+  database_url?: string;
+  storage_bucket?: string;
   status: string;
   created_at: string;
   updated_at: string;
@@ -46,7 +52,7 @@ export class SupabaseService {
   }
 
   // Database Connections
-  async saveConnection(connection: Omit<DatabaseConnection, 'id' | 'status' | 'tables' | 'createdAt'>): Promise<SupabaseConnection> {
+  async saveConnection(connection: any): Promise<SupabaseConnection> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -64,6 +70,12 @@ export class SupabaseService {
         project_id: connection.projectId,
         api_key: connection.apiKey, // TODO: Encrypt this
         auth_domain: connection.authDomain,
+        // Firebase Admin SDK fields
+        service_account_key: connection.serviceAccountKey, // TODO: Encrypt this
+        admin_api_key: connection.adminApiKey, // TODO: Encrypt this
+        admin_auth_domain: connection.adminAuthDomain,
+        database_url: connection.databaseURL,
+        storage_bucket: connection.storageBucket,
         status: 'connected'
       })
       .select()

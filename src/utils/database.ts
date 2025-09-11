@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, query, limit } from 'firebase/firestore';
-import FirebaseAuthService from '../lib/firebaseAuth';
 // Removed automatic Firebase import to prevent connection errors
 
 export interface DatabaseConnection {
@@ -16,6 +15,12 @@ export interface DatabaseConnection {
   projectId?: string;
   apiKey?: string;
   authDomain?: string;
+  // Firebase Admin SDK fields
+  serviceAccountKey?: string;
+  adminApiKey?: string;
+  adminAuthDomain?: string;
+  databaseURL?: string;
+  storageBucket?: string;
   status: 'connected' | 'disconnected' | 'error';
   tables: DatabaseTable[];
   createdAt: string;
@@ -432,20 +437,44 @@ export class DatabaseManager {
       // The connection already has the API key from when the user connected
       const { db, app } = connection;
       
-      // Get auth instance for this specific connection
+      // Debug: Log what project we're connecting to
+      console.log('Firebase app config:', app.options);
+      console.log('Project ID:', app.options.projectId);
+      console.log('API Key:', app.options.apiKey?.substring(0, 10) + '...');
+      
+      // Properly authenticate and wait for auth state before making Firestore calls
       try {
-        const { getAuth, signInAnonymously } = await import('firebase/auth');
+        const { getAuth, signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
         const auth = getAuth(app);
         
-        // Check if already signed in
-        if (!auth.currentUser) {
-          console.log('Signing in anonymously for Firestore access...');
-          await signInAnonymously(auth);
-          console.log('Anonymous sign-in successful');
-        }
-      } catch (authError) {
-        console.warn('Anonymous auth failed, proceeding without auth:', authError);
-        // Continue without auth - some rules might still allow access
+        // Wait for authentication to complete
+        await new Promise<void>((resolve, reject) => {
+          const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            unsubscribe(); // Clean up listener
+            
+            if (user) {
+              console.log('User authenticated:', user.uid, 'isAnonymous:', user.isAnonymous);
+              resolve();
+            } else {
+              // No user, sign in anonymously
+              try {
+                console.log('Signing in anonymously...');
+                await signInAnonymously(auth);
+                console.log('Anonymous sign-in successful');
+                resolve();
+              } catch (signInError) {
+                console.error('Anonymous sign-in failed:', signInError);
+                reject(signInError);
+              }
+            }
+          });
+        });
+        
+        console.log('Authentication state established, proceeding with Firestore calls');
+        
+      } catch (authError: any) {
+        console.warn('Authentication setup failed:', authError);
+        console.log('Proceeding without authentication - relying on public rules');
       }
 
       const tables: DatabaseTable[] = [];
@@ -508,8 +537,8 @@ export class DatabaseManager {
               });
             }
 
-            // Get actual document count by fetching more docs
-            const fullSnapshot = await getDocs(collection(db, collectionName));
+            // Get actual document count by fetching more docs (limited to avoid performance issues)
+            const fullSnapshot = await getDocs(query(collection(db, collectionName), limit(100)));
             
             tables.push({
               id: `collection_${collectionName}`,
@@ -522,13 +551,19 @@ export class DatabaseManager {
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-            if (message.toLowerCase().includes('missing or insufficient permissions')) {
-              permissionDenied.push(collectionName);
-              console.log(`Permission denied for collection ${collectionName}`);
-            } else {
-              console.log(`Collection ${collectionName} not found or no access:`, message);
-            }
-            continue;
+          console.log(`Error accessing collection ${collectionName}:`, error);
+          console.log(`Error message: "${message}"`);
+          console.log(`Error code:`, (error as any)?.code);
+          
+          if (message.toLowerCase().includes('missing or insufficient permissions') || 
+              message.toLowerCase().includes('permission-denied') ||
+              (error as any)?.code === 'permission-denied') {
+            permissionDenied.push(collectionName);
+            console.log(`Permission denied for collection ${collectionName}`);
+          } else {
+            console.log(`Collection ${collectionName} not found or other error:`, message);
+          }
+          continue;
         }
       }
 
@@ -651,7 +686,7 @@ export class DatabaseManager {
   }
 
   private async getFirebaseTableData(connection: any, collectionName: string, limitCount: number = 100, offset: number = 0): Promise<any[]> {
-    const { db } = connection;
+    const { db, app } = connection;
     
     try {
       // Skip placeholder pseudo-collection
@@ -659,9 +694,40 @@ export class DatabaseManager {
         return [];
       }
 
-      // Ensure authentication before making Firestore calls (fixes 400 Bad Request)
-      const authService = FirebaseAuthService.getInstance();
-      await authService.ensureAuthenticated();
+      // Use connection-specific auth and wait for auth state
+      try {
+        const { getAuth, signInAnonymously, onAuthStateChanged } = await import('firebase/auth');
+        const auth = getAuth(app);
+        
+        // Wait for authentication state before proceeding
+        await new Promise<void>((resolve, reject) => {
+          const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            unsubscribe(); // Clean up listener
+            
+            if (user) {
+              console.log('Data access - User already authenticated:', user.uid);
+              resolve();
+            } else {
+              // No user, sign in anonymously
+              try {
+                console.log('Data access - Signing in anonymously...');
+                await signInAnonymously(auth);
+                console.log('Data access - Anonymous sign-in successful');
+                resolve();
+              } catch (signInError) {
+                console.error('Data access - Anonymous sign-in failed:', signInError);
+                reject(signInError);
+              }
+            }
+          });
+        });
+        
+        console.log('Data access - Authentication confirmed, proceeding with query');
+        
+      } catch (authError: any) {
+        console.warn('Data access - Authentication setup failed:', authError);
+        console.log('Data access - Proceeding without authentication');
+      }
       
       // Get documents from the collection
       const snapshot = await getDocs(query(collection(db, collectionName), limit(limitCount)));

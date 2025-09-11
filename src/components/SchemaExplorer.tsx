@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Database, Table, Eye, Search, RefreshCw } from 'lucide-react';
-import { DatabaseManager } from '../utils/database';
+import { UnifiedDatabaseService } from '../utils/unifiedDatabase';
 
 interface SchemaExplorerProps {
   databases: any[];
@@ -119,10 +119,13 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     
     setLoading(true);
     try {
-      const dbManager = DatabaseManager.getInstance();
-      // Ensure underlying connection exists (especially for firebase after reload)
-      await (dbManager as any).ensureConnection?.(selectedDatabase);
-      const schema = await dbManager.introspectDatabase(selectedDatabase.id || selectedDatabase.name);
+      const unifiedService = UnifiedDatabaseService.getInstance();
+      
+      // Connect to database using unified service (this will handle admin credentials for Firebase)
+      await unifiedService.connectToDatabase(selectedDatabase);
+      
+      // Introspect database schema
+      const schema = await unifiedService.introspectDatabase(selectedDatabase.id);
       setTables(schema);
     } catch (error) {
       console.error('Failed to load schema:', error);
@@ -137,8 +140,16 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     
     setLoading(true);
     try {
-      const dbManager = DatabaseManager.getInstance();
-      const data = await dbManager.getTableData(selectedDatabase.id || selectedDatabase.name, table.name, 10);
+      const unifiedService = UnifiedDatabaseService.getInstance();
+      
+      // Get adapter for this database
+      const adapter = unifiedService.getAdapter(selectedDatabase.id);
+      if (!adapter) {
+        throw new Error('Database adapter not found');
+      }
+      
+      // Query table data directly through adapter
+      const data = await adapter.listDocuments(table.name, 10);
       setTableData(data);
       setSelectedTable(table);
     } catch (error) {

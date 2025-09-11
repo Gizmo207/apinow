@@ -20,7 +20,13 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     password: '',
     projectId: '',
     apiKey: '',
-    authDomain: ''
+    authDomain: '',
+    // Firebase Admin SDK fields
+    serviceAccountKey: '',
+    adminApiKey: '',
+    adminAuthDomain: '',
+    databaseURL: '',
+    storageBucket: ''
   });
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
   const [connectionResults, setConnectionResults] = useState<{ [key: string]: 'success' | 'error' | null }>({});
@@ -77,7 +83,13 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
         password: '',
         projectId: '',
         apiKey: '',
-        authDomain: ''
+        authDomain: '',
+        // Firebase Admin SDK fields
+        serviceAccountKey: '',
+        adminApiKey: '',
+        adminAuthDomain: '',
+        databaseURL: '',
+        storageBucket: ''
       });
     } catch (error) {
       setConnectionResults(prev => ({ ...prev, ['new']: 'error' }));
@@ -223,43 +235,98 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
 
             {formData.type === 'firebase' && (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Project ID
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.projectId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, projectId: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="my-firebase-project"
-                    required
-                  />
+                <div className="border-b border-gray-200 pb-4">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Client SDK Configuration</h3>
+                  <p className="text-sm text-gray-600 mb-4">These credentials are used for reading data from your frontend</p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Project ID
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.projectId}
+                        onChange={(e) => setFormData(prev => ({ ...prev, projectId: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="my-firebase-project"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        API Key
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.apiKey}
+                        onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="AIzaSyC..."
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Auth Domain (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.authDomain}
+                        onChange={(e) => setFormData(prev => ({ ...prev, authDomain: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="my-firebase-project.firebaseapp.com"
+                      />
+                    </div>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    API Key
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.apiKey}
-                    onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="AIzaSyC..."
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Auth Domain (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.authDomain}
-                    onChange={(e) => setFormData(prev => ({ ...prev, authDomain: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="my-firebase-project.firebaseapp.com"
-                  />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Admin SDK Configuration</h3>
+                  <p className="text-sm text-gray-600 mb-4">These credentials enable full admin access for API generation</p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Service Account Key (JSON)
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={formData.serviceAccountKey}
+                        onChange={(e) => setFormData(prev => ({ ...prev, serviceAccountKey: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                        placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", "private_key": "...", ...}'
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Download this from Firebase Console → Project Settings → Service Accounts → Generate new private key
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Database URL (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.databaseURL}
+                        onChange={(e) => setFormData(prev => ({ ...prev, databaseURL: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="https://my-project-default-rtdb.firebaseio.com/"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Storage Bucket (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.storageBucket}
+                        onChange={(e) => setFormData(prev => ({ ...prev, storageBucket: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="my-project.appspot.com"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -367,8 +434,22 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{database.name}</h3>
                     <p className="text-sm text-gray-600">
-                      {database.type.toUpperCase()} • {database.database}
+                      {database.type.toUpperCase()} • {database.database || database.projectId}
                     </p>
+                    {database.type === 'firebase' && database.serviceAccountKey && (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                          ✅ Admin SDK Configured
+                        </span>
+                      </div>
+                    )}
+                    {database.type === 'firebase' && !database.serviceAccountKey && (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                          ⚠️ Admin SDK Missing
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">

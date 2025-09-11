@@ -12,6 +12,7 @@ import { Dashboard } from './components/Dashboard';
 import { DatabaseConnector } from './components/DatabaseConnector';
 import { SchemaExplorer } from './components/SchemaExplorer';
 import { APIBuilder } from './components/APIBuilder';
+import { UnifiedAPIBuilder } from './components/UnifiedAPIBuilder';
 import { APITester } from './components/APITester';
 import { Documentation } from './components/Documentation';
 import { Analytics } from './components/Analytics';
@@ -128,6 +129,12 @@ function MainApp({ user, onLogout }: { user: any; onLogout: () => void }) {
           projectId: conn.project_id,
           apiKey: conn.api_key,
           authDomain: conn.auth_domain,
+          // Firebase Admin SDK fields
+          serviceAccountKey: conn.service_account_key,
+          adminApiKey: conn.admin_api_key,
+          adminAuthDomain: conn.admin_auth_domain,
+          databaseURL: conn.database_url,
+          storageBucket: conn.storage_bucket,
           connected: conn.status === 'connected',
           createdAt: conn.created_at
         }));
@@ -189,6 +196,7 @@ function MainApp({ user, onLogout }: { user: any; onLogout: () => void }) {
     { id: 'databases', label: 'Databases', icon: '🗄️' },
     { id: 'schema', label: 'Schema Explorer', icon: '🔍' },
     { id: 'builder', label: 'API Builder', icon: '🔧' },
+    { id: 'unified', label: 'Unified API', icon: '🔗' },
     { id: 'tester', label: 'API Tester', icon: '🧪' },
     { id: 'docs', label: 'Documentation', icon: '📄' },
     { id: 'analytics', label: 'Analytics', icon: '📊' },
@@ -203,6 +211,8 @@ function MainApp({ user, onLogout }: { user: any; onLogout: () => void }) {
         return <SchemaExplorer databases={databases} currentView={currentView} onViewChange={setCurrentView} endpoints={endpoints} user={user} />;
       case 'builder':
         return <APIBuilder databases={databases} onEndpointsChange={setEndpoints} />;
+      case 'unified':
+        return <UnifiedAPIBuilder databases={databases} />;
       case 'tester':
         return <APITester />;
       case 'docs':
