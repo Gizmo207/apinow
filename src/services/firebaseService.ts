@@ -116,6 +116,16 @@ export class FirebaseService {
     })) as DatabaseConnection[];
   }
 
+  // Server-safe method to get connection by ID (no auth required)
+  async getConnectionById(connectionId: string): Promise<DatabaseConnection | null> {
+    const docRef = doc(db, 'database_connections', connectionId);
+    const snapshot = await getDoc(docRef);
+    
+    if (!snapshot.exists()) return null;
+    
+    return { id: snapshot.id, ...snapshot.data() } as DatabaseConnection;
+  }
+
   async updateConnection(id: string, updates: Partial<DatabaseConnection>): Promise<DatabaseConnection> {
     const docRef = doc(db, 'database_connections', id);
     await updateDoc(docRef, {
@@ -160,6 +170,28 @@ export class FirebaseService {
       id: doc.id,
       ...doc.data()
     })) as APIEndpoint[];
+  }
+
+  // Server-safe method to get endpoint by path and method with userId verification
+  async getEndpointByPath(path: string, method: string, userId?: string): Promise<APIEndpoint | null> {
+    const constraints = [
+      where('path', '==', path),
+      where('method', '==', method),
+      where('isActive', '==', true)
+    ];
+
+    // If userId provided, verify ownership
+    if (userId) {
+      constraints.push(where('userId', '==', userId));
+    }
+
+    const q = query(collection(db, 'api_endpoints'), ...constraints);
+
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return null;
+    
+    const doc = querySnapshot.docs[0];
+    return { id: doc.id, ...doc.data() } as APIEndpoint;
   }
 
   async updateEndpoint(id: string, updates: Partial<APIEndpoint>): Promise<APIEndpoint> {

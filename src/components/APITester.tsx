@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, Copy, Download, Check } from 'lucide-react';
+import { getAuthHeaders } from '@/lib/clientAuth';
 
 export function APITester() {
   const [url, setUrl] = useState('');
@@ -11,13 +12,55 @@ export function APITester() {
   const [responseStatus, setResponseStatus] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
+  const [useAuth, setUseAuth] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   const handleSendRequest = async () => {
     if (!url) return;
 
     setLoading(true);
+    setDebugInfo('');
+    let debugLog = '';
+    
+    console.log('=== API TESTER DEBUG START ===');
+    console.log('useAuth state:', useAuth);
+    console.log('URL:', url);
+    console.log('URL includes localhost:', url.includes('localhost'));
+    
     try {
-      const parsedHeaders = JSON.parse(headers);
+      let parsedHeaders = JSON.parse(headers);
+      console.log('Initial headers:', parsedHeaders);
+      
+      debugLog += `useAuth: ${useAuth}\n`;
+      debugLog += `URL: ${url}\n`;
+      debugLog += `Includes localhost: ${url.includes('localhost')}\n`;
+      
+      // Add auth token if enabled and URL is localhost
+      if (useAuth && url.includes('localhost')) {
+        console.log('[API Tester] ✅ Auth is ENABLED and URL is localhost');
+        console.log('[API Tester] Getting auth headers...');
+        debugLog += '✅ Getting auth headers...\n';
+        
+        const authHeaders = await getAuthHeaders();
+        console.log('[API Tester] Auth headers received:', JSON.stringify(authHeaders, null, 2));
+        debugLog += `Auth headers: ${JSON.stringify(authHeaders, null, 2)}\n`;
+        
+        parsedHeaders = {
+          ...parsedHeaders,
+          ...authHeaders
+        };
+      } else {
+        console.log('[API Tester] ❌ Auth disabled or not localhost URL');
+        console.log('  - useAuth:', useAuth);
+        console.log('  - includes localhost:', url.includes('localhost'));
+        debugLog += '❌ Auth NOT added\n';
+      }
+      
+      debugLog += `Final headers: ${JSON.stringify(parsedHeaders, null, 2)}\n`;
+      console.log('[API Tester] Final headers to send:', JSON.stringify(parsedHeaders, null, 2));
+      
+      setDebugInfo(debugLog);
+      
       const options: RequestInit = {
         method,
         headers: parsedHeaders,
@@ -27,14 +70,19 @@ export function APITester() {
         options.body = body;
       }
 
+      console.log('[API Tester] Sending request to:', url);
       const res = await fetch(url, options);
       const responseText = await res.text();
+      console.log('[API Tester] Response status:', res.status);
+      console.log('=== API TESTER DEBUG END ===');
       
       setResponse(responseText);
       setResponseStatus(res.status);
     } catch (error) {
+      console.error('[API Tester] Request failed:', error);
       setResponse(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setResponseStatus(null);
+      setDebugInfo(debugLog + `\n❌ Error: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -190,6 +238,28 @@ export function APITester() {
                 className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                 placeholder='{"key": "value"}'
               />
+            </div>
+          )}
+
+          {/* Authentication Toggle */}
+          <div className="mb-4 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useAuth"
+              checked={useAuth}
+              onChange={(e) => setUseAuth(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="useAuth" className="text-sm text-gray-700">
+              Include authentication (auto-adds Bearer token for localhost)
+            </label>
+          </div>
+
+          {/* Debug Info */}
+          {debugInfo && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="text-xs font-semibold text-yellow-800 mb-1">Debug Info:</div>
+              <pre className="text-xs text-yellow-900 whitespace-pre-wrap font-mono">{debugInfo}</pre>
             </div>
           )}
 

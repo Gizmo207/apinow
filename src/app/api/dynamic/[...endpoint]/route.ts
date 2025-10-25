@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UnifiedDatabaseService } from '@/utils/unifiedDatabase';
-import { FirebaseService } from '@/services/firebaseService';
+import { getEndpointByPath, getConnectionById } from '@/services/firebaseServiceServer';
+import { verifyAuthToken } from '@/lib/serverAuth';
 
 /**
  * Dynamic API Route Handler
@@ -9,37 +10,42 @@ import { FirebaseService } from '@/services/firebaseService';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
-  return handleDynamicRequest(request, params, 'GET');
+  const resolvedParams = await params;
+  return handleDynamicRequest(request, resolvedParams, 'GET');
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
-  return handleDynamicRequest(request, params, 'POST');
+  const resolvedParams = await params;
+  return handleDynamicRequest(request, resolvedParams, 'POST');
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
-  return handleDynamicRequest(request, params, 'PUT');
+  const resolvedParams = await params;
+  return handleDynamicRequest(request, resolvedParams, 'PUT');
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
-  return handleDynamicRequest(request, params, 'DELETE');
+  const resolvedParams = await params;
+  return handleDynamicRequest(request, resolvedParams, 'DELETE');
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
-  return handleDynamicRequest(request, params, 'PATCH');
+  const resolvedParams = await params;
+  return handleDynamicRequest(request, resolvedParams, 'PATCH');
 }
 
 async function handleDynamicRequest(
@@ -52,20 +58,29 @@ async function handleDynamicRequest(
     const requestedPath = `/api/dynamic/${params.endpoint.join('/')}`;
     console.log(`Dynamic API request: ${method} ${requestedPath}`);
 
-    // Get all endpoint configurations from Firestore
-    const firebaseService = FirebaseService.getInstance();
-    const endpoints = await firebaseService.getEndpoints();
+    // Verify authentication
+    let userId: string;
+    try {
+      const authContext = await verifyAuthToken(request);
+      userId = authContext.userId;
+    } catch (error) {
+      return NextResponse.json(
+        { 
+          error: 'Unauthorized',
+          message: 'Authentication required. Please provide a valid Bearer token in the Authorization header.'
+        },
+        { status: 401 }
+      );
+    }
 
-    // Find matching endpoint
-    const matchedEndpoint = endpoints.find(
-      (ep) => ep.path === requestedPath && ep.method === method
-    );
+    // Get endpoint configuration from Firestore and verify ownership
+    const matchedEndpoint = await getEndpointByPath(requestedPath, method, userId);
 
     if (!matchedEndpoint) {
       return NextResponse.json(
         { 
           error: 'Endpoint not found',
-          message: `No endpoint configured for ${method} ${requestedPath}`
+          message: `No endpoint configured for ${method} ${requestedPath} or you don't have access to it`
         },
         { status: 404 }
       );
@@ -73,27 +88,21 @@ async function handleDynamicRequest(
 
     console.log('Matched endpoint:', matchedEndpoint);
 
-    // Check authentication if required
-    if (matchedEndpoint.authRequired) {
-      const authHeader = request.headers.get('authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return NextResponse.json(
-          { error: 'Unauthorized', message: 'Authentication required' },
-          { status: 401 }
-        );
-      }
-      // TODO: Validate the token properly
-      // For now, just check it exists
-    }
-
-    // Get the database connection by connectionId
-    const databases = await firebaseService.getConnections();
-    const database = databases.find((db) => db.id === matchedEndpoint.connectionId);
+    // Get the database connection by connectionId (server-safe method)
+    const database = await getConnectionById(matchedEndpoint.connectionId);
 
     if (!database) {
       return NextResponse.json(
         { error: 'Database not found', message: `Database with ID "${matchedEndpoint.connectionId}" not configured` },
         { status: 500 }
+      );
+    }
+
+    // Verify database ownership for security
+    if (database.userId !== userId) {
+      return NextResponse.json(
+        { error: 'Forbidden', message: 'You do not have access to this database connection' },
+        { status: 403 }
       );
     }
 
