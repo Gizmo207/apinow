@@ -8,7 +8,7 @@ import { FirebaseService } from '@/services/firebaseService';
 import { Dashboard } from '@/components/Dashboard';
 import { DatabaseConnector } from '@/components/DatabaseConnector';
 import { SchemaExplorer } from '@/components/SchemaExplorer';
-import { APIBuilder } from '@/components/APIBuilder';
+import { MyAPIs } from '@/components/MyAPIs';
 import { UnifiedAPIBuilder } from '@/components/UnifiedAPIBuilder';
 import { APITester } from '@/components/APITester';
 import { Documentation } from '@/components/Documentation';
@@ -103,7 +103,7 @@ export default function DashboardPage() {
       case 'schema':
         return <SchemaExplorer databases={databases} currentView={currentView} onViewChange={setCurrentView} endpoints={endpoints} user={user} />;
       case 'builder':
-        return <APIBuilder databases={databases} onEndpointsChange={setEndpoints} />;
+        return <MyAPIs />;
       case 'unified':
         return <UnifiedAPIBuilder databases={databases} />;
       case 'tester':

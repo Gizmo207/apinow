@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Play, Code, CheckCircle, XCircle, Loader, Save, Bookmark } from 'lucide-react';
+import { Database, Play, Code, CheckCircle, XCircle, Loader, Save, Check } from 'lucide-react';
 import { UnifiedDatabaseService } from '../utils/unifiedDatabase';
 import { DatabaseConnection } from '../utils/database';
 import { APIEndpoint } from '../lib/apiGenerator';
@@ -59,9 +59,33 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       
       // Generate API endpoints
       const generatedEndpoints = await unifiedService.generateAPIEndpoints(database.id);
-      setEndpoints(generatedEndpoints);
+      console.log(`🔍 Generated ${generatedEndpoints.length} total endpoints`);
       
-      console.log(`Generated ${generatedEndpoints.length} endpoints for ${database.name}`);
+      // Check for duplicate IDs (debugging)
+      const ids = generatedEndpoints.map(ep => ep.id);
+      const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+      if (duplicateIds.length > 0) {
+        console.warn('⚠️ Found duplicate endpoint IDs:', duplicateIds);
+      }
+      
+      // Filter out endpoints that are already saved
+      const unsavedEndpoints = generatedEndpoints.filter(endpoint => {
+        const endpointPath = `/api/dynamic${endpoint.path}`;
+        const isAlreadySaved = savedEndpoints.some(saved => saved.path === endpointPath);
+        if (isAlreadySaved) {
+          console.log(`⏭️ Skipping already saved: ${endpoint.method} ${endpointPath}`);
+        }
+        return !isAlreadySaved;
+      });
+      
+      setEndpoints(unsavedEndpoints);
+      
+      const filteredCount = generatedEndpoints.length - unsavedEndpoints.length;
+      if (filteredCount > 0) {
+        console.log(`✨ Showing ${unsavedEndpoints.length} new endpoints (${filteredCount} already saved)`);
+      } else {
+        console.log(`✨ Generated ${unsavedEndpoints.length} endpoints for ${database.name}`);
+      }
     } catch (error) {
       console.error('Failed to generate endpoints:', error);
       setEndpoints([]);
@@ -73,7 +97,14 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   const saveEndpoint = async (endpoint: APIEndpoint) => {
     if (!selectedDatabase) return;
     
+    // Prevent double-clicking by checking if already saving
+    if (savingEndpoint === endpoint.id) {
+      console.log('Already saving this endpoint, ignoring duplicate click');
+      return;
+    }
+    
     setSavingEndpoint(endpoint.id);
+    console.log(`🔄 Saving endpoint: ${endpoint.method} ${endpoint.path} (ID: ${endpoint.id})`);
     
     try {
       const { FirebaseService } = await import('../services/firebaseService');
@@ -91,13 +122,26 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
         isActive: true
       };
 
+      console.log(`💾 Saving to Firestore:`, endpointConfig);
       const savedEndpoint = await firebaseService.saveEndpoint(endpointConfig);
-      setSavedEndpoints(prev => [...prev, savedEndpoint]);
       
-      alert(`✅ API endpoint saved! You can now use it at:\n${endpointConfig.path}`);
+      // Update saved endpoints list
+      setSavedEndpoints(prev => {
+        const updated = [...prev, savedEndpoint];
+        console.log(`✅ Updated saved endpoints count: ${updated.length}`);
+        return updated;
+      });
+      
+      // Remove the saved endpoint from the current list
+      setEndpoints(prev => {
+        const filtered = prev.filter(ep => ep.id !== endpoint.id);
+        console.log(`📝 Remaining endpoints in list: ${filtered.length}`);
+        return filtered;
+      });
+      
+      console.log(`✅ Successfully saved: ${endpointConfig.path}`);
     } catch (error) {
-      console.error('Failed to save endpoint:', error);
-      alert('Failed to save endpoint: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('❌ Failed to save endpoint:', error);
     } finally {
       setSavingEndpoint(null);
     }
@@ -353,30 +397,29 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
         <p className="text-gray-600">
           Browse auto-generated endpoints, test them, and save the ones you want to use
         </p>
+        {savedEndpoints.length > 0 && (
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <span className="text-gray-600">
+              💾 You have <strong>{savedEndpoints.length}</strong> saved {savedEndpoints.length === 1 ? 'API' : 'APIs'}
+            </span>
+            <a
+              href="#builder"
+              className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+            >
+              View in My APIs →
+            </a>
+            <button
+              onClick={() => {
+                console.log('🔍 Current saved endpoints:', savedEndpoints);
+                console.log('📋 Saved endpoint paths:', savedEndpoints.map(ep => ep.path));
+              }}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              Debug Saved APIs
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* My Saved APIs Section */}
-      {savedEndpoints.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Bookmark className="w-5 h-5 text-blue-600" />
-            <h2 className="font-semibold text-blue-900">My Saved APIs ({savedEndpoints.length})</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {savedEndpoints.map((endpoint) => (
-              <div key={endpoint.id} className="flex items-center gap-2 bg-white p-2 rounded text-sm">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getMethodColor(endpoint.method)}`}>
-                  {endpoint.method}
-                </span>
-                <code className="text-xs font-mono text-gray-700">{endpoint.path}</code>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-blue-700 mt-2">
-            💡 These APIs are now live! Test them in the API Tester tab.
-          </p>
-        </div>
-      )}
 
       {/* Database Selection */}
       <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -408,7 +451,14 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       {selectedDatabase && (
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Generated API Endpoints</h2>
+            <div>
+              <h2 className="text-lg font-semibold">Available API Endpoints</h2>
+              {!loading && endpoints.length > 0 && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {endpoints.length} new {endpoints.length === 1 ? 'endpoint' : 'endpoints'} ready to save
+                </p>
+              )}
+            </div>
             {loading && <Loader className="w-5 h-5 animate-spin text-blue-600" />}
           </div>
 
@@ -417,8 +467,18 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
               Generating endpoints...
             </div>
           ) : endpoints.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No endpoints available. Make sure the database is connected and has collections.
+            <div className="text-center py-12 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-green-900 mb-2">All Endpoints Saved! 🎉</h3>
+              <p className="text-green-700 mb-4">
+                You've saved all available endpoints from this database.
+              </p>
+              <a
+                href="#builder"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                View My APIs →
+              </a>
             </div>
           ) : (
             <div className="space-y-4">
@@ -458,7 +518,7 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
                         {savingEndpoint === endpoint.id ? (
                           <Loader className="w-4 h-4 animate-spin" />
                         ) : savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? (
-                          <Bookmark className="w-4 h-4 fill-current" />
+                          <Check className="w-4 h-4" />
                         ) : (
                           <Save className="w-4 h-4" />
                         )}

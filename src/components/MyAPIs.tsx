@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, ExternalLink, Zap, RefreshCw, Shield, ShieldOff } from 'lucide-react';
+import { Trash2, ExternalLink, Zap, RefreshCw, Shield, ShieldOff, CheckCircle, XCircle } from 'lucide-react';
 
 export function MyAPIs() {
   const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     loadSavedEndpoints();
   }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
 
   const loadSavedEndpoints = async () => {
     setLoading(true);
@@ -35,16 +47,36 @@ export function MyAPIs() {
       const firebaseService = FirebaseService.getInstance();
       await firebaseService.deleteEndpoint(id);
       setSavedEndpoints(prev => prev.filter(ep => ep.id !== id));
+      showToast('API endpoint deleted successfully', 'success');
     } catch (error) {
       console.error('Failed to delete endpoint:', error);
-      alert('Failed to delete endpoint: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      showToast('Failed to delete endpoint', 'error');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      return false;
+    }
   };
 
   const getMethodColor = (method: string) => {
@@ -173,9 +205,13 @@ export function MyAPIs() {
                   {/* Actions */}
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        copyToClipboard(`http://localhost:3000${endpoint.path}`);
-                        alert('Endpoint URL copied to clipboard!');
+                      onClick={async () => {
+                        const success = await copyToClipboard(`http://localhost:3000${endpoint.path}`);
+                        if (success) {
+                          showToast('Endpoint URL copied to clipboard!', 'success');
+                        } else {
+                          showToast('Failed to copy URL', 'error');
+                        }
                       }}
                       className="flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                     >
@@ -217,6 +253,22 @@ export function MyAPIs() {
             <li>Use these URLs in your frontend apps or external tools</li>
             <li>Protected endpoints require an Authorization header</li>
           </ul>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-4 right-4 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-slide-up z-50 ${
+          toast.type === 'success' 
+            ? 'bg-green-600 text-white' 
+            : 'bg-red-600 text-white'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : (
+            <XCircle className="w-5 h-5" />
+          )}
+          <span className="font-medium">{toast.message}</span>
         </div>
       )}
     </div>
