@@ -125,23 +125,93 @@ export function Analytics() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Request Volume</h3>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No data available</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Request Volume by Day</h3>
+          {data && Object.keys(data.requestsByDay).length > 0 ? (
+            <div className="h-64 flex items-end justify-around space-x-2 px-4">
+              {Object.entries(data.requestsByDay).slice(-7).map(([date, count], index) => {
+                const maxCount = Math.max(...Object.values(data.requestsByDay));
+                const heightPercent = (count / maxCount) * 80; // Use 80% max height
+                const heightPx = Math.max((heightPercent / 100) * 240, 40); // Min 40px height
+                return (
+                  <div key={index} className="flex flex-col items-center" style={{ width: '60px' }}>
+                    <div className="relative group w-full flex items-end justify-center" style={{ height: '240px' }}>
+                      <div 
+                        className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors cursor-pointer" 
+                        style={{ height: `${heightPx}px` }}
+                      >
+                        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-3 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          {count} requests
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 text-center font-medium">{date.split('/')[0]}/{date.split('/')[1]}</p>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">No data available</p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Response Times</h3>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <Clock className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No data available</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Response Times (Last 10 Requests)</h3>
+          {data && data.recentActivity.length > 0 ? (
+            <div className="h-64">
+              <div className="h-full flex items-end justify-around space-x-1 px-2">
+                {data.recentActivity.slice(0, 10).reverse().map((activity, index) => {
+                  const maxTime = Math.max(...data.recentActivity.slice(0, 10).map(a => a.responseTime));
+                  const heightPercent = (activity.responseTime / maxTime) * 80;
+                  const heightPx = Math.max((heightPercent / 100) * 200, 30); // Min 30px height
+                  return (
+                    <div key={index} className="flex flex-col items-center" style={{ width: '40px' }}>
+                      <div className="relative group w-full flex items-end justify-center" style={{ height: '200px' }}>
+                        <div 
+                          className={`w-full rounded-t transition-colors cursor-pointer ${
+                            activity.responseTime < 1000 ? 'bg-green-500 hover:bg-green-600' :
+                            activity.responseTime < 2000 ? 'bg-yellow-500 hover:bg-yellow-600' :
+                            'bg-red-500 hover:bg-red-600'
+                          }`}
+                          style={{ height: `${heightPx}px` }}
+                        >
+                          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {activity.responseTime}ms
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2 font-medium">#{10 - index}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 flex items-center justify-center space-x-4 text-xs">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded mr-1"></div>
+                  <span className="text-gray-600">&lt;1s</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-yellow-500 rounded mr-1"></div>
+                  <span className="text-gray-600">1-2s</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-red-500 rounded mr-1"></div>
+                  <span className="text-gray-600">&gt;2s</span>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <Clock className="w-16 h-16 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">No data available</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
