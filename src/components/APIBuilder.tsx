@@ -27,9 +27,29 @@ export function APIBuilder({ databases = [], onEndpointsChange }: APIBuilderProp
   }, [databases]);
 
   useEffect(() => {
-    if (selectedDatabase && selectedDatabase.tables) {
-      setTables(selectedDatabase.tables);
-    }
+    const loadTables = async () => {
+      if (!selectedDatabase) return;
+      
+      // Use the SAME method as SchemaExplorer to get tables
+      try {
+        const { UnifiedDatabaseService } = await import('../utils/unifiedDatabase');
+        const unifiedService = UnifiedDatabaseService.getInstance();
+        
+        // Connect to database using unified service
+        await unifiedService.connectToDatabase(selectedDatabase);
+        
+        // Introspect database schema - same as SchemaExplorer
+        const schema = await unifiedService.introspectDatabase(selectedDatabase.id);
+        setTables(schema);
+        
+        console.log('API Builder loaded tables:', schema.map(t => t.name));
+      } catch (error) {
+        console.error('Failed to load tables:', error);
+        setTables([]);
+      }
+    };
+    
+    loadTables();
   }, [selectedDatabase]);
 
   const handleSubmit = (e: React.FormEvent) => {
