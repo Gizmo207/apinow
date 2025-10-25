@@ -27,6 +27,7 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
   const [viewModes, setViewModes] = useState<Map<string, "pretty" | "raw">>(new Map());
   const [activeSaves, setActiveSaves] = useState<Set<string>>(new Set());
+  const [hasGeneratedEndpoints, setHasGeneratedEndpoints] = useState(false);
 
   const unifiedService = UnifiedDatabaseService.getInstance();
 
@@ -50,6 +51,7 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
     setSelectedDatabase(db);
     setEndpoints([]);
     setTestResults(new Map());
+    setHasGeneratedEndpoints(false);
     await generateEndpoints(db);
   };
 
@@ -67,9 +69,11 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       );
       
       setEndpoints(unsaved);
+      setHasGeneratedEndpoints(true);
     } catch (error) {
       console.error("Endpoint generation failed:", error);
       setEndpoints([]);
+      setHasGeneratedEndpoints(true);
     } finally {
       setLoading(false);
     }
@@ -248,6 +252,10 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
           <h2 className="text-lg font-semibold mb-4">Available Endpoints</h2>
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : !hasGeneratedEndpoints ? (
+            <div className="text-center py-12 text-gray-500">
+              <p>Select a database above to view available endpoints</p>
+            </div>
           ) : endpoints.length === 0 ? (
             <div className="text-center py-12 bg-green-50 border border-green-200 rounded-lg">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
