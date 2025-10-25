@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, ArrowRight, Loader } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { getUserSubscription } from '../lib/stripe';
 
 interface SuccessPageProps {
@@ -75,7 +75,7 @@ export function SuccessPage({ onContinue }: SuccessPageProps) {
           </button>
 
           <Link
-            to="/pricing"
+            href="/pricing"
             className="block w-full text-center text-blue-600 hover:text-blue-700 py-2"
           >
             View all plans

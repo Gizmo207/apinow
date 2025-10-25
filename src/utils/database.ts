@@ -96,28 +96,13 @@ export class DatabaseManager {
   }
 
   private async testSQLiteConnection(config: any): Promise<{ success: boolean; message: string }> {
-    try {
-      // Create an in-memory SQLite database for demo purposes
-      const Database = (await import('better-sqlite3')).default;
-      const db = new Database(':memory:');
-      
-      // Create sample tables with realistic data
-      this.createSampleTables(db);
-      
-      // Store the connection
-      this.connections.set(config.name, db);
-      
-      return { 
-        success: true, 
-        message: 'SQLite database connected successfully with sample data' 
-      };
-    } catch (error) {
-      console.error('SQLite connection failed:', error);
-      return { 
-        success: false, 
-        message: `SQLite connection failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-      };
-    }
+    // SQLite connections require server-side implementation
+    // This is a stub for client-side compatibility
+    console.warn('SQLite testing not available in browser context');
+    return { 
+      success: false, 
+      message: 'SQLite connections must be configured via API routes (server-side only)' 
+    };
   }
 
   private createSampleTables(db: any) {

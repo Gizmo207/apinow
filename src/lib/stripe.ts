@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+// Stripe integration - stub implementation for now
+// TODO: Implement proper Stripe backend integration
 
 interface CreateCheckoutSessionParams {
   priceId: string;
@@ -13,56 +14,22 @@ export async function createCheckoutSession({
   successUrl,
   cancelUrl,
 }: CreateCheckoutSessionParams): Promise<{ sessionId: string; url: string }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session) {
-    throw new Error('User not authenticated');
-  }
-
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      price_id: priceId,
-      mode,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to create checkout session');
-  }
-
-  return response.json();
+  // Stub implementation - redirect to success for now
+  console.warn('Stripe checkout not yet implemented');
+  return {
+    sessionId: 'stub_session',
+    url: successUrl
+  };
 }
 
 export async function getUserSubscription() {
-  const { data, error } = await supabase
-    .from('stripe_user_subscriptions')
-    .select('*')
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  // Stub implementation
+  console.warn('getUserSubscription not yet implemented');
+  return null;
 }
 
 export async function getUserOrders() {
-  const { data, error } = await supabase
-    .from('stripe_user_orders')
-    .select('*')
-    .order('order_date', { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
+  // Stub implementation
+  console.warn('getUserOrders not yet implemented');
+  return [];
 }
