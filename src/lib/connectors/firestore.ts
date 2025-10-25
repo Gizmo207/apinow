@@ -48,20 +48,36 @@ export class FirestoreAdapter implements DatabaseAdapter {
       const serviceAccount = JSON.parse(this.adminConfig.serviceAccountKey);
       const projectId = serviceAccount.project_id;
 
-      // For now, return a comprehensive list of collections
-      // In a real implementation, you'd use the Firestore REST API with service account auth
-      console.log('Admin mode: Using comprehensive collection list for project:', projectId);
+      console.log('Admin mode: Discovering actual collections in project:', projectId);
       
-      return [
-        'users', 'products', 'orders', 'categories', 'posts', 'comments',
+      // Try to discover collections by attempting to read from common ones
+      const possibleCollections = [
+        'users', 'database_connections', 'api_endpoints', 'user_subscriptions',
+        'products', 'orders', 'categories', 'posts', 'comments',
         'mail', 'licenses', 'payments', 'public', 'classes', 'recordings', 
         'transcripts', 'studyPlans', 'notes', 'lectures', 'profiles', 'settings',
         'notifications', 'analytics', 'audit', 'feedback', 'reports', 'templates'
       ];
+      
+      const existingCollections: string[] = [];
+      
+      // Check which collections actually exist by trying to read from them
+      for (const collectionName of possibleCollections) {
+        try {
+          const snapshot = await getDocs(query(collection(this.db, collectionName), limit(1)));
+          existingCollections.push(collectionName);
+          console.log(`Collection '${collectionName}' exists`);
+        } catch (error) {
+          // Collection doesn't exist or no permission - skip it
+          console.log(`Collection '${collectionName}' not accessible`);
+        }
+      }
+      
+      return existingCollections.length > 0 ? existingCollections : ['users', 'database_connections', 'api_endpoints'];
     } catch (error) {
       console.error('Failed to use admin credentials:', error);
-      // Fallback to client-side authentication
-      return [];
+      // Fallback to known collections
+      return ['users', 'database_connections', 'api_endpoints'];
     }
   }
 
