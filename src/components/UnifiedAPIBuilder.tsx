@@ -57,7 +57,7 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
     setLoading(true);
     try {
       await unifiedService.connectToDatabase(db);
-      const generated = await unifiedService.generateAPIEndpoints(db.id);
+      const generated = await unifiedService.generateAPIEndpoints(db.id, db);
       
       const unsaved = generated.filter(ep => 
         !savedEndpoints.some(saved => 
@@ -289,12 +289,12 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
                     </button>
                     <button
                       onClick={() => saveEndpoint(ep)}
-                      disabled={savingEndpoint === ep.id || savedEndpoints.some(s => s.path === `/api/dynamic${ep.path}`)}
+                      disabled={savingEndpoint === ep.id || savedEndpoints.some(s => s.path === `/api/dynamic${ep.path}` && s.method === ep.method)}
                       className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm"
                     >
                       {savingEndpoint === ep.id ? (
                         <Loader className="w-4 h-4 animate-spin" />
-                      ) : savedEndpoints.some(s => s.path === `/api/dynamic${ep.path}`) ? (
+                      ) : savedEndpoints.some(s => s.path === `/api/dynamic${ep.path}` && s.method === ep.method) ? (
                         <Check className="w-4 h-4" />
                       ) : (
                         <Save className="w-4 h-4" />

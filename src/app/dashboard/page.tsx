@@ -20,10 +20,23 @@ type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'unified' | '
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [currentView, setCurrentView] = useState<ViewType>('databases');
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboardView');
+      return (saved as ViewType) || 'databases';
+    }
+    return 'databases';
+  });
   const [databases, setDatabases] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Persist current view to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboardView', currentView);
+    }
+  }, [currentView]);
 
   useEffect(() => {
     if (!user) {
@@ -77,8 +90,52 @@ export default function DashboardPage() {
     loadUserData();
   }, [user, router]);
 
-  const handleDatabasesChange = (newDatabases: any[]) => {
-    setDatabases(newDatabases);
+  const handleAddDatabase = async (db: any) => {
+    const firebaseService = FirebaseService.getInstance();
+    try {
+      await firebaseService.saveConnection(db);
+      const connections = await firebaseService.getConnections();
+      const formatted = connections.map(conn => ({
+        id: conn.id,
+        name: conn.name,
+        type: conn.type,
+        host: conn.host,
+        port: conn.port,
+        database: conn.databaseName,
+        username: conn.username,
+        password: conn.encryptedPassword,
+        projectId: conn.projectId,
+        apiKey: conn.apiKey,
+        authDomain: conn.authDomain,
+        serviceAccountKey: conn.serviceAccountKey,
+        adminApiKey: conn.adminApiKey,
+        adminAuthDomain: conn.adminAuthDomain,
+        databaseURL: conn.databaseURL,
+        storageBucket: conn.storageBucket,
+        connected: conn.status === 'connected',
+        createdAt: conn.createdAt
+      }));
+      setDatabases(formatted);
+    } catch (error) {
+      console.error('Failed to add database:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteDatabase = async (id: string) => {
+    const firebaseService = FirebaseService.getInstance();
+    try {
+      await firebaseService.deleteConnection(id);
+      setDatabases(prev => prev.filter(db => db.id !== id));
+    } catch (error) {
+      console.error('Failed to delete database:', error);
+      throw error;
+    }
+  };
+
+  const handleTestDatabase = async (db: any) => {
+    // Test connection logic
+    console.log('Testing database connection:', db);
   };
 
   const handleEndpointsChange = (newEndpoints: any[]) => {
@@ -99,7 +156,7 @@ export default function DashboardPage() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'databases':
-        return <DatabaseConnector databases={databases} onDatabasesChange={handleDatabasesChange} />;
+        return <DatabaseConnector databases={databases} onAdd={handleAddDatabase} onDelete={handleDeleteDatabase} onTest={handleTestDatabase} />;
       case 'schema':
         return <SchemaExplorer databases={databases} currentView={currentView} onViewChange={setCurrentView} endpoints={endpoints} user={user} />;
       case 'builder':

@@ -124,8 +124,8 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       // Connect to database using unified service (this will handle admin credentials for Firebase)
       await unifiedService.connectToDatabase(selectedDatabase);
       
-      // Introspect database schema
-      const schema = await unifiedService.introspectDatabase(selectedDatabase.id);
+      // Introspect database schema (pass connection for Firebase server-side access)
+      const schema = await unifiedService.introspectDatabase(selectedDatabase.id, selectedDatabase);
       setTables(schema);
     } catch (error) {
       console.error('Failed to load schema:', error);

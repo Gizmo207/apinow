@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Database, Plus, Trash2, TestTube, CheckCircle, XCircle, Loader, Edit } from 'lucide-react';
-import { DatabaseManager } from '../utils/database';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -85,8 +84,6 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
     setTestingConnection(testId);
     
     try {
-      const dbManager = DatabaseManager.getInstance();
-      
       // Create temporary connection object for testing
       const tempConnection = {
         id: testId,
@@ -95,7 +92,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
         createdAt: new Date().toISOString()
       };
       
-      await dbManager.testConnection(tempConnection);
+      await onTest(tempConnection);
       
       // Connection successful, add to list
       if (editingDatabase) {
@@ -157,15 +154,8 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
   const handleTestConnection = async (database: any) => {
     setTestingConnection(database.id);
     try {
-      const dbManager = DatabaseManager.getInstance();
-      await dbManager.testConnection(database);
+      await onTest(database);
       setConnectionResults(prev => ({ ...prev, [database.id]: 'success' }));
-      
-      // Update database status
-      const updatedDatabases = databases.map(db => 
-        db.id === database.id ? { ...db, connected: true } : db
-      );
-      onTest(updatedDatabases.find(db => db.id === database.id));
     } catch (error) {
       setConnectionResults(prev => ({ ...prev, [database.id]: 'error' }));
       console.error('Connection test failed:', error);

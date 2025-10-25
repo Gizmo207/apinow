@@ -82,12 +82,34 @@ export class UnifiedDatabaseService {
     }
   }
 
-  async introspectDatabase(connectionId: string): Promise<DatabaseTable[]> {
+  async introspectDatabase(connectionId: string, connection?: DatabaseConnection): Promise<DatabaseTable[]> {
     const adapter = this.adapters.get(connectionId);
     if (!adapter) {
       throw new Error(`No adapter found for connection: ${connectionId}`);
     }
 
+    // For Firebase, use server-side API route
+    if (adapter.type === 'firestore' && connection) {
+      try {
+        const response = await fetch('/api/database/introspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connection })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API introspection failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.tables || [];
+      } catch (error) {
+        console.error('Failed to introspect Firebase via API:', error);
+        throw error;
+      }
+    }
+
+    // For other database types, use client-side adapter
     try {
       const collections = await adapter.listCollections();
       const tables: DatabaseTable[] = [];
@@ -108,12 +130,9 @@ export class UnifiedDatabaseService {
                 fieldType = 'number';
               } else if (typeof fieldValue === 'boolean') {
                 fieldType = 'boolean';
-              } else if (fieldValue instanceof Date || (fieldValue && typeof fieldValue === 'object' && fieldValue.toDate)) {
-                fieldType = 'timestamp';
-              } else if (Array.isArray(fieldValue)) {
-                fieldType = 'array';
               } else if (typeof fieldValue === 'object' && fieldValue !== null) {
-                fieldType = 'object';
+                fieldType = typeof fieldValue.toDate === 'function' ? 'timestamp' : 
+                           Array.isArray(fieldValue) ? 'array' : 'object';
               }
               
               return {
@@ -128,23 +147,12 @@ export class UnifiedDatabaseService {
             tables.push({
               id: `collection_${collectionName}`,
               name: collectionName,
-              rowCount: sampleDocs.length, // Approximate count
+              rowCount: sampleDocs.length,
               columns
             });
           }
         } catch (error) {
           console.warn(`Could not introspect collection ${collectionName}:`, error);
-          // Add as denied collection
-          tables.push({
-            id: `collection_${collectionName}`,
-            name: collectionName,
-            rowCount: 0,
-            columns: [],
-            meta: { 
-              permissionDenied: true, 
-              source: 'unified-connector' 
-            }
-          });
         }
       }
 
@@ -155,12 +163,85 @@ export class UnifiedDatabaseService {
     }
   }
 
-  async generateAPIEndpoints(connectionId: string): Promise<APIEndpoint[]> {
+  async generateAPIEndpoints(connectionId: string, connection?: DatabaseConnection): Promise<APIEndpoint[]> {
+    const adapter = this.adapters.get(connectionId);
     const apiGenerator = this.apiGenerators.get(connectionId);
-    if (!apiGenerator) {
+    
+    if (!apiGenerator || !adapter) {
       throw new Error(`No API generator found for connection: ${connectionId}`);
     }
 
+    // For Firebase, get collections via server-side API
+    if (adapter.type === 'firestore' && connection) {
+      try {
+        const response = await fetch('/api/database/introspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connection })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API introspection failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const collections = data.collections || [];
+        
+        // Generate endpoints manually
+        const endpoints: APIEndpoint[] = [];
+        for (const collection of collections) {
+          endpoints.push(
+            {
+              id: `${collection}-list`,
+              collection,
+              method: 'GET',
+              path: `/api/${collection}`,
+              description: `List all documents in ${collection}`,
+              enabled: true
+            },
+            {
+              id: `${collection}-create`,
+              collection,
+              method: 'POST',
+              path: `/api/${collection}`,
+              description: `Create a new document in ${collection}`,
+              enabled: true
+            },
+            {
+              id: `${collection}-read`,
+              collection,
+              method: 'GET',
+              path: `/api/${collection}/:id`,
+              description: `Get a single document from ${collection}`,
+              enabled: true
+            },
+            {
+              id: `${collection}-update`,
+              collection,
+              method: 'PUT',
+              path: `/api/${collection}/:id`,
+              description: `Update a document in ${collection}`,
+              enabled: true
+            },
+            {
+              id: `${collection}-delete`,
+              collection,
+              method: 'DELETE',
+              path: `/api/${collection}/:id`,
+              description: `Delete a document from ${collection}`,
+              enabled: true
+            }
+          );
+        }
+        
+        return endpoints;
+      } catch (error) {
+        console.error('Failed to generate Firebase endpoints via API:', error);
+        throw error;
+      }
+    }
+
+    // For other database types, use the generator
     return await apiGenerator.generateEndpoints();
   }
 
