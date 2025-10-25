@@ -30,7 +30,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     storageBucket: ''
   });
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
-  const [connectionResults, setConnectionResults] = useState<{ [key: string]: 'success' | 'error' | null }>({});
+  const [connectionResults, setConnectionResults] = useState<{ [key: string]: { status: 'success' | 'error'; message: string } | null }>({});
 
   const handleEdit = (database: any) => {
     setEditingDatabase(database);
@@ -94,7 +94,11 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
         createdAt: new Date().toISOString()
       };
       
-      await dbManager.testConnection(tempConnection);
+      const testResult = await dbManager.testConnection(tempConnection);
+      
+      if (!testResult.success) {
+        throw new Error(testResult.message);
+      }
       
       // Connection successful, save to Firebase
       const firebaseService = FirebaseService.getInstance();
@@ -119,7 +123,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
             : db
         );
         
-        setConnectionResults(prev => ({ ...prev, [editingDatabase.id]: 'success' }));
+        setConnectionResults(prev => ({ ...prev, [editingDatabase.id]: { status: 'success', message: testResult.message } }));
         onDatabasesChange(updatedDatabases);
       } else {
         // Create new connection
@@ -148,13 +152,14 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
           createdAt: savedConnection.createdAt
         };
         
-        setConnectionResults(prev => ({ ...prev, [newDatabase.id]: 'success' }));
+        setConnectionResults(prev => ({ ...prev, [newDatabase.id]: { status: 'success', message: testResult.message } }));
         onDatabasesChange([...databases, newDatabase]);
       }
       
       resetForm();
     } catch (error) {
-      setConnectionResults(prev => ({ ...prev, [testId]: 'error' }));
+      console.error('Failed to save connection:', error);
+      setConnectionResults(prev => ({ ...prev, [testId]: { status: 'error', message: error instanceof Error ? error.message : 'Connection failed' } }));
       console.error('Connection failed:', error);
     } finally {
       setTestingConnection(null);
@@ -165,8 +170,13 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     setTestingConnection(database.id);
     try {
       const dbManager = DatabaseManager.getInstance();
-      await dbManager.testConnection(database);
-      setConnectionResults(prev => ({ ...prev, [database.id]: 'success' }));
+      const testResult = await dbManager.testConnection(database);
+      
+      if (!testResult.success) {
+        throw new Error(testResult.message);
+      }
+      
+      setConnectionResults(prev => ({ ...prev, [database.id]: { status: 'success', message: testResult.message } }));
       
       // Update database status
       const updatedDatabases = databases.map(db => 
@@ -174,7 +184,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
       );
       onDatabasesChange(updatedDatabases);
     } catch (error) {
-      setConnectionResults(prev => ({ ...prev, [database.id]: 'error' }));
+      setConnectionResults(prev => ({ ...prev, [database.id]: { status: 'error', message: error instanceof Error ? error.message : 'Connection test failed. Please check your credentials.' } }));
       console.error('Connection test failed:', error);
     } finally {
       setTestingConnection(null);
@@ -203,9 +213,9 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     }
     
     const result = connectionResults[database.id];
-    if (result === 'success') {
+    if (result?.status === 'success') {
       return <CheckCircle className="w-4 h-4 text-green-500" />;
-    } else if (result === 'error') {
+    } else if (result?.status === 'error') {
       return <XCircle className="w-4 h-4 text-red-500" />;
     }
     
@@ -543,18 +553,18 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                 </div>
               </div>
               
-              {connectionResults[database.id] === 'success' && (
+              {connectionResults[database.id]?.status === 'success' && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-sm text-green-800">
-                    ✅ Connection successful! Sample data has been created.
+                    ✅ {connectionResults[database.id]?.message || 'Connection successful!'}
                   </p>
                 </div>
               )}
               
-              {connectionResults[database.id] === 'error' && (
+              {connectionResults[database.id]?.status === 'error' && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-800">
-                    ❌ Connection failed. Please check your database settings.
+                    ❌ {connectionResults[database.id]?.message || 'Connection test failed. Please check your credentials.'}
                   </p>
                 </div>
               )}
