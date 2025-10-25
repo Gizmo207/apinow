@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Database, Plus, Trash2, TestTube, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Database, Plus, Trash2, TestTube, CheckCircle, XCircle, Loader, Edit } from 'lucide-react';
 import { DatabaseManager } from '../utils/database';
-import { SupabaseService } from '../utils/supabase-service';
+import { FirebaseService } from '../services/firebaseService';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -10,6 +10,7 @@ interface DatabaseConnectorProps {
 
 export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConnectorProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingDatabase, setEditingDatabase] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
     type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
@@ -31,17 +32,63 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
   const [connectionResults, setConnectionResults] = useState<{ [key: string]: 'success' | 'error' | null }>({});
 
+  const handleEdit = (database: any) => {
+    setEditingDatabase(database);
+    setFormData({
+      name: database.name,
+      type: database.type,
+      host: database.host || '',
+      port: database.port || '',
+      database: database.database || '',
+      username: database.username || '',
+      password: database.password || '',
+      projectId: database.projectId || '',
+      apiKey: database.apiKey || '',
+      authDomain: database.authDomain || '',
+      serviceAccountKey: database.serviceAccountKey || '',
+      adminApiKey: database.adminApiKey || '',
+      adminAuthDomain: database.adminAuthDomain || '',
+      databaseURL: database.databaseURL || '',
+      storageBucket: database.storageBucket || ''
+    });
+    setShowAddForm(true);
+  };
+
+  const resetForm = () => {
+    setEditingDatabase(null);
+    setShowAddForm(false);
+    setFormData({
+      name: '',
+      type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
+      host: '',
+      port: '',
+      database: '',
+      username: '',
+      password: '',
+      projectId: '',
+      apiKey: '',
+      authDomain: '',
+      serviceAccountKey: '',
+      adminApiKey: '',
+      adminAuthDomain: '',
+      databaseURL: '',
+      storageBucket: ''
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Test connection first
-    setTestingConnection('new');
+    const testId = editingDatabase ? editingDatabase.id : 'new';
+    setTestingConnection(testId);
+    
     try {
       const dbManager = DatabaseManager.getInstance();
       
       // Create temporary connection object for testing
       const tempConnection = {
-        id: 'temp',
+        id: testId,
         ...formData,
         connected: false,
         createdAt: new Date().toISOString()
@@ -49,50 +96,65 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
       
       await dbManager.testConnection(tempConnection);
       
-      // Connection successful, save to Supabase
-      const supabaseService = SupabaseService.getInstance();
-      const savedConnection = await supabaseService.saveConnection(formData);
+      // Connection successful, save to Firebase
+      const firebaseService = FirebaseService.getInstance();
       
-      // Convert Supabase format to local format
-      const newDatabase = {
-        id: savedConnection.id,
-        name: savedConnection.name,
-        type: savedConnection.type,
-        host: savedConnection.host,
-        port: savedConnection.port,
-        database: savedConnection.database_name,
-        username: savedConnection.username,
-        password: savedConnection.encrypted_password,
-        projectId: savedConnection.project_id,
-        apiKey: savedConnection.api_key,
-        authDomain: savedConnection.auth_domain,
-        connected: true,
-        createdAt: savedConnection.created_at
-      };
+      if (editingDatabase) {
+        // Update existing connection
+        await firebaseService.updateConnection(editingDatabase.id, formData);
+        
+        // Update local database list
+        const updatedDatabases = databases.map(db => 
+          db.id === editingDatabase.id 
+            ? { 
+                ...db, 
+                ...formData,
+                // Map Firebase Admin SDK fields
+                serviceAccountKey: formData.serviceAccountKey,
+                adminApiKey: formData.adminApiKey,
+                adminAuthDomain: formData.adminAuthDomain,
+                databaseURL: formData.databaseURL,
+                storageBucket: formData.storageBucket
+              }
+            : db
+        );
+        
+        setConnectionResults(prev => ({ ...prev, [editingDatabase.id]: 'success' }));
+        onDatabasesChange(updatedDatabases);
+      } else {
+        // Create new connection
+        const savedConnection = await firebaseService.saveConnection(formData);
+        
+        // Convert Firebase format to local format
+        const newDatabase = {
+          id: savedConnection.id,
+          name: savedConnection.name,
+          type: savedConnection.type,
+          host: savedConnection.host,
+          port: savedConnection.port,
+          database: savedConnection.databaseName,
+          username: savedConnection.username,
+          password: savedConnection.encryptedPassword,
+          projectId: savedConnection.projectId,
+          apiKey: savedConnection.apiKey,
+          authDomain: savedConnection.authDomain,
+          // Firebase Admin SDK fields
+          serviceAccountKey: savedConnection.serviceAccountKey,
+          adminApiKey: savedConnection.adminApiKey,
+          adminAuthDomain: savedConnection.adminAuthDomain,
+          databaseURL: savedConnection.databaseURL,
+          storageBucket: savedConnection.storageBucket,
+          connected: true,
+          createdAt: savedConnection.createdAt
+        };
+        
+        setConnectionResults(prev => ({ ...prev, [newDatabase.id]: 'success' }));
+        onDatabasesChange([...databases, newDatabase]);
+      }
       
-      setConnectionResults(prev => ({ ...prev, [newDatabase.id]: 'success' }));
-      onDatabasesChange([...databases, newDatabase]);
-      setShowAddForm(false);
-      setFormData({
-        name: '',
-        type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
-        host: '',
-        port: '',
-        database: '',
-        username: '',
-        password: '',
-        projectId: '',
-        apiKey: '',
-        authDomain: '',
-        // Firebase Admin SDK fields
-        serviceAccountKey: '',
-        adminApiKey: '',
-        adminAuthDomain: '',
-        databaseURL: '',
-        storageBucket: ''
-      });
+      resetForm();
     } catch (error) {
-      setConnectionResults(prev => ({ ...prev, ['new']: 'error' }));
+      setConnectionResults(prev => ({ ...prev, [testId]: 'error' }));
       console.error('Connection failed:', error);
     } finally {
       setTestingConnection(null);
@@ -121,8 +183,8 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
 
   const handleDelete = async (id: string) => {
     try {
-      const supabaseService = SupabaseService.getInstance();
-      await supabaseService.deleteConnection(id);
+      const firebaseService = FirebaseService.getInstance();
+      await firebaseService.deleteConnection(id);
       
       onDatabasesChange(databases.filter(db => db.id !== id));
       setConnectionResults(prev => {
@@ -461,6 +523,14 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                   >
                     <TestTube className="w-4 h-4" />
                     <span>Test</span>
+                  </button>
+                  <button
+                    onClick={() => console.log('Edit clicked:', database)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    aria-label={`Edit ${database.name} connection`}
+                    title="Edit Connection"
+                  >
+                    <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(database.id)}
