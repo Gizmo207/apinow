@@ -242,7 +242,9 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
 
       {showAddForm && (
         <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold mb-4">Add New Database Connection</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            {editingDatabase ? 'Edit Database Connection' : 'Add New Database Connection'}
+          </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -467,7 +469,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={resetForm}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
@@ -477,7 +479,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                 disabled={testingConnection !== null}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                {testingConnection ? 'Testing...' : 'Add Database'}
+                {testingConnection ? 'Testing...' : editingDatabase ? 'Update Database' : 'Add Database'}
               </button>
             </div>
           </form>
@@ -535,7 +537,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                     <span>Test</span>
                   </button>
                   <button
-                    onClick={() => console.log('Edit clicked:', database)}
+                    onClick={() => handleEdit(database)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                     aria-label={`Edit ${database.name} connection`}
                     title="Edit Connection"
