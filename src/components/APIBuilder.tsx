@@ -52,32 +52,56 @@ export function APIBuilder({ databases = [], onEndpointsChange }: APIBuilderProp
     loadTables();
   }, [selectedDatabase]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newEndpoint = {
-      id: Date.now().toString(),
-      ...formData,
-      database: selectedDatabase?.name,
-      createdAt: new Date().toISOString()
-    };
-
-    const updatedEndpoints = [...endpoints, newEndpoint];
-    setEndpoints(updatedEndpoints);
-    
-    if (onEndpointsChange) {
-      onEndpointsChange(updatedEndpoints);
+    if (!selectedDatabase) {
+      alert('Please select a database');
+      return;
     }
 
-    setShowAddForm(false);
-    setFormData({
-      name: '',
-      table: '',
-      method: 'GET',
-      path: '',
-      authentication: true,
-      filters: []
-    });
+    try {
+      // Save endpoint to Firestore
+      const { FirebaseService } = await import('../services/firebaseService');
+      const firebaseService = FirebaseService.getInstance();
+      
+      const endpointConfig = {
+        name: formData.name,
+        path: formData.path,
+        method: formData.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
+        tableName: formData.table,
+        connectionId: selectedDatabase.id,
+        authRequired: formData.authentication,
+        filters: formData.filters,
+        rateLimit: 100,
+        isActive: true
+      };
+
+      const savedEndpoint = await firebaseService.saveEndpoint(endpointConfig);
+      
+      // Update local state
+      const updatedEndpoints = [...endpoints, savedEndpoint];
+      setEndpoints(updatedEndpoints);
+      
+      if (onEndpointsChange) {
+        onEndpointsChange(updatedEndpoints);
+      }
+
+      setShowAddForm(false);
+      setFormData({
+        name: '',
+        table: '',
+        method: 'GET',
+        path: '',
+        authentication: true,
+        filters: []
+      });
+      
+      alert('API Endpoint created successfully! You can now test it in the API Tester.');
+    } catch (error) {
+      console.error('Failed to save endpoint:', error);
+      alert('Failed to create endpoint: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
   };
 
   const handleDelete = (id: string) => {

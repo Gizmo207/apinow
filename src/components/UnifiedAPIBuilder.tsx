@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Play, Code, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Database, Play, Code, CheckCircle, XCircle, Loader, Save, Bookmark } from 'lucide-react';
 import { UnifiedDatabaseService } from '../utils/unifiedDatabase';
 import { DatabaseConnection } from '../utils/database';
 import { APIEndpoint } from '../lib/apiGenerator';
@@ -14,6 +14,9 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<Map<string, any>>(new Map());
   const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null);
+  const [savingEndpoint, setSavingEndpoint] = useState<string | null>(null);
+  const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
+  const [viewModes, setViewModes] = useState<Map<string, 'pretty' | 'raw'>>(new Map());
 
   const unifiedService = UnifiedDatabaseService.getInstance();
 
@@ -22,6 +25,21 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       setSelectedDatabase(databases[0]);
     }
   }, [databases, selectedDatabase]);
+
+  // Load saved endpoints
+  useEffect(() => {
+    const loadSavedEndpoints = async () => {
+      try {
+        const { FirebaseService } = await import('../services/firebaseService');
+        const firebaseService = FirebaseService.getInstance();
+        const saved = await firebaseService.getEndpoints();
+        setSavedEndpoints(saved);
+      } catch (error) {
+        console.error('Failed to load saved endpoints:', error);
+      }
+    };
+    loadSavedEndpoints();
+  }, []);
 
   const handleDatabaseSelect = async (database: DatabaseConnection) => {
     setSelectedDatabase(database);
@@ -49,6 +67,39 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       setEndpoints([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveEndpoint = async (endpoint: APIEndpoint) => {
+    if (!selectedDatabase) return;
+    
+    setSavingEndpoint(endpoint.id);
+    
+    try {
+      const { FirebaseService } = await import('../services/firebaseService');
+      const firebaseService = FirebaseService.getInstance();
+      
+      const endpointConfig = {
+        name: endpoint.description || `${endpoint.method} ${endpoint.collection}`,
+        path: `/api/dynamic${endpoint.path}`,
+        method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
+        tableName: endpoint.collection,
+        connectionId: selectedDatabase.id,
+        authRequired: true,
+        filters: [],
+        rateLimit: 100,
+        isActive: true
+      };
+
+      const savedEndpoint = await firebaseService.saveEndpoint(endpointConfig);
+      setSavedEndpoints(prev => [...prev, savedEndpoint]);
+      
+      alert(`✅ API endpoint saved! You can now use it at:\n${endpointConfig.path}`);
+    } catch (error) {
+      console.error('Failed to save endpoint:', error);
+      alert('Failed to save endpoint: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setSavingEndpoint(null);
     }
   };
 
@@ -155,26 +206,140 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
     }
   };
 
+  const formatValue = (value: any): string => {
+    // Handle Firestore timestamps
+    if (typeof value === 'object' && value !== null) {
+      if (value.seconds !== undefined && value.nanoseconds !== undefined) {
+        const date = new Date(value.seconds * 1000);
+        return date.toLocaleString();
+      }
+      if (value._seconds !== undefined) {
+        const date = new Date(value._seconds * 1000);
+        return date.toLocaleString();
+      }
+    }
+    
+    // Handle other types
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  const renderPrettyView = (data: any) => {
+    try {
+      // Case 1: Array of objects - render as table
+      if (Array.isArray(data) && data.length > 0) {
+        const headers = Object.keys(data[0] || {});
+        
+        return (
+          <div className="overflow-auto max-h-64 mt-2">
+            <table className="min-w-full border-collapse text-xs">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr>
+                  {headers.map(header => (
+                    <th key={header} className="border border-gray-300 px-2 py-1 text-left font-semibold text-gray-700">
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((row: any, rowIndex: number) => (
+                  <tr key={rowIndex} className="hover:bg-gray-50">
+                    {headers.map(header => (
+                      <td key={header} className="border border-gray-300 px-2 py-1 text-gray-600">
+                        {formatValue(row[header])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      
+      // Case 2: Single object - render as key-value pairs
+      if (typeof data === 'object' && data !== null) {
+        return (
+          <div className="overflow-auto max-h-64 space-y-1 p-2 mt-2 text-xs">
+            {Object.entries(data).map(([key, value]) => (
+              <div key={key} className="flex border-b border-gray-200 pb-1">
+                <span className="font-semibold text-gray-700 w-1/3">{key}:</span>
+                <span className="text-gray-600 w-2/3 break-all">{formatValue(value)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      
+      // Fallback: render as formatted JSON
+      return (
+        <pre className="text-xs overflow-x-auto mt-2 p-2 bg-gray-50 rounded">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      );
+    } catch (error) {
+      return (
+        <pre className="text-xs overflow-x-auto mt-2 p-2">
+          {String(data)}
+        </pre>
+      );
+    }
+  };
+
   const renderTestResult = (endpointId: string) => {
     const result = testResults.get(endpointId);
     if (!result) return null;
 
+    const viewMode = viewModes.get(endpointId) || 'pretty';
+
     return (
-      <div className={`mt-2 p-2 rounded text-sm ${result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+      <div className={`mt-2 p-3 rounded ${result.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
         {result.success ? (
           <div>
-            <div className="flex items-center gap-1 mb-1">
-              <CheckCircle className="w-4 h-4" />
-              <span className="font-medium">Success</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <span className="font-medium text-green-800 text-sm">Test Successful</span>
+              </div>
+              {/* Pretty/Raw Toggle */}
+              <div className="flex gap-1 bg-white rounded p-1">
+                <button
+                  onClick={() => setViewModes(prev => new Map(prev.set(endpointId, 'pretty')))}
+                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                    viewMode === 'pretty'
+                      ? 'bg-blue-100 text-blue-700 font-semibold'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Pretty
+                </button>
+                <button
+                  onClick={() => setViewModes(prev => new Map(prev.set(endpointId, 'raw')))}
+                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                    viewMode === 'raw'
+                      ? 'bg-blue-100 text-blue-700 font-semibold'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Raw
+                </button>
+              </div>
             </div>
-            <pre className="text-xs overflow-x-auto">
-              {JSON.stringify(result.data, null, 2)}
-            </pre>
+            {viewMode === 'pretty' ? (
+              renderPrettyView(result.data)
+            ) : (
+              <pre className="text-xs overflow-x-auto p-2 bg-white rounded">
+                {JSON.stringify(result.data, null, 2)}
+              </pre>
+            )}
           </div>
         ) : (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 text-red-800">
             <XCircle className="w-4 h-4" />
-            <span>{result.error}</span>
+            <span className="text-sm">{result.error}</span>
           </div>
         )}
       </div>
@@ -184,11 +349,34 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Unified API Builder</h1>
+        <h1 className="text-2xl font-bold text-gray-900">🔍 API Explorer</h1>
         <p className="text-gray-600">
-          Generate and test REST APIs for any database type using the unified connector layer
+          Browse auto-generated endpoints, test them, and save the ones you want to use
         </p>
       </div>
+
+      {/* My Saved APIs Section */}
+      {savedEndpoints.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bookmark className="w-5 h-5 text-blue-600" />
+            <h2 className="font-semibold text-blue-900">My Saved APIs ({savedEndpoints.length})</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {savedEndpoints.map((endpoint) => (
+              <div key={endpoint.id} className="flex items-center gap-2 bg-white p-2 rounded text-sm">
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getMethodColor(endpoint.method)}`}>
+                  {endpoint.method}
+                </span>
+                <code className="text-xs font-mono text-gray-700">{endpoint.path}</code>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-blue-700 mt-2">
+            💡 These APIs are now live! Test them in the API Tester tab.
+          </p>
+        </div>
+      )}
 
       {/* Database Selection */}
       <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -248,18 +436,35 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
                         {endpoint.path}
                       </code>
                     </div>
-                    <button
-                      onClick={() => testEndpoint(endpoint)}
-                      disabled={testingEndpoint === endpoint.id}
-                      className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {testingEndpoint === endpoint.id ? (
-                        <Loader className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Play className="w-4 h-4" />
-                      )}
-                      Test
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => testEndpoint(endpoint)}
+                        disabled={testingEndpoint === endpoint.id}
+                        className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                      >
+                        {testingEndpoint === endpoint.id ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                        Test
+                      </button>
+                      <button
+                        onClick={() => saveEndpoint(endpoint)}
+                        disabled={savingEndpoint === endpoint.id || savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`)}
+                        className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                        title={savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? 'Already saved' : 'Save this endpoint'}
+                      >
+                        {savingEndpoint === endpoint.id ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? (
+                          <Bookmark className="w-4 h-4 fill-current" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        {savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? 'Saved' : 'Save'}
+                      </button>
+                    </div>
                   </div>
                   
                   <p className="text-sm text-gray-600 mb-2">{endpoint.description}</p>

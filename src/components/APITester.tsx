@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Copy, Download } from 'lucide-react';
+import { Send, Copy, Download, Check } from 'lucide-react';
 
 export function APITester() {
   const [url, setUrl] = useState('');
@@ -9,6 +9,8 @@ export function APITester() {
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [responseStatus, setResponseStatus] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
+  const [copied, setCopied] = useState(false);
 
   const handleSendRequest = async () => {
     if (!url) return;
@@ -35,6 +37,101 @@ export function APITester() {
       setResponseStatus(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCopyResponse = () => {
+    navigator.clipboard.writeText(response);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatValue = (value: any): string => {
+    // Handle Firestore timestamps
+    if (typeof value === 'object' && value !== null) {
+      if (value.seconds !== undefined && value.nanoseconds !== undefined) {
+        const date = new Date(value.seconds * 1000);
+        return date.toLocaleString();
+      }
+      if (value._seconds !== undefined) {
+        const date = new Date(value._seconds * 1000);
+        return date.toLocaleString();
+      }
+    }
+    
+    // Handle other types
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  const renderPrettyView = () => {
+    try {
+      const data = JSON.parse(response);
+      
+      // Extract the actual data if it's wrapped in a response object
+      const actualData = data.data || data;
+      
+      // Case 1: Array of objects - render as table
+      if (Array.isArray(actualData) && actualData.length > 0) {
+        const headers = Object.keys(actualData[0] || {});
+        
+        return (
+          <div className="overflow-auto max-h-96">
+            <table className="min-w-full border-collapse">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr>
+                  {headers.map(header => (
+                    <th key={header} className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold text-gray-700">
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {actualData.map((row: any, rowIndex: number) => (
+                  <tr key={rowIndex} className="hover:bg-gray-50">
+                    {headers.map(header => (
+                      <td key={header} className="border border-gray-300 px-3 py-2 text-sm text-gray-600">
+                        {formatValue(row[header])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      
+      // Case 2: Single object - render as key-value pairs
+      if (typeof actualData === 'object' && actualData !== null) {
+        return (
+          <div className="overflow-auto max-h-96 space-y-2 p-3">
+            {Object.entries(actualData).map(([key, value]) => (
+              <div key={key} className="flex border-b border-gray-200 pb-2">
+                <span className="font-semibold text-gray-700 w-1/3">{key}:</span>
+                <span className="text-gray-600 w-2/3 break-all">{formatValue(value)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      
+      // Fallback: render as formatted JSON
+      return (
+        <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-96 text-gray-800">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      );
+    } catch (error) {
+      // If not valid JSON, show as plain text
+      return (
+        <pre className="bg-gray-50 p-3 rounded text-sm overflow-auto max-h-96 text-gray-800 whitespace-pre-wrap">
+          {response}
+        </pre>
+      );
     }
   };
 
@@ -114,11 +211,12 @@ export function APITester() {
             {response && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => navigator.clipboard.writeText(response)}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={handleCopyResponse}
+                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                   title="Copy response"
                 >
-                  <Copy className="w-4 h-4" />
+                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -126,7 +224,7 @@ export function APITester() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'api-response.txt';
+                    a.download = 'api-response.json';
                     a.click();
                   }}
                   className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -153,13 +251,53 @@ export function APITester() {
             </div>
           )}
 
+          {/* Pretty/Raw Toggle */}
+          {response && (
+            <div className="flex gap-2 mb-3 bg-gray-100 p-2 rounded-md">
+              <button
+                onClick={() => setViewMode('pretty')}
+                className={`px-3 py-1 text-sm rounded transition-colors ${
+                  viewMode === 'pretty'
+                    ? 'bg-white font-semibold text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Pretty
+              </button>
+              <button
+                onClick={() => setViewMode('raw')}
+                className={`px-3 py-1 text-sm rounded transition-colors ${
+                  viewMode === 'raw'
+                    ? 'bg-white font-semibold text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Raw
+              </button>
+            </div>
+          )}
+
           {/* Response Body */}
-          <div className="border border-gray-200 rounded-md">
-            <textarea
-              value={response || 'No response yet. Send a request to see the result.'}
-              readOnly
-              className="w-full h-96 px-3 py-2 font-mono text-sm bg-gray-50 border-0 rounded-md resize-none"
-            />
+          <div className="border border-gray-200 rounded-md bg-gray-50">
+            {response ? (
+              viewMode === 'pretty' ? (
+                renderPrettyView()
+              ) : (
+                <pre className="p-3 text-sm overflow-auto max-h-96 text-gray-800 font-mono">
+                  {(() => {
+                    try {
+                      return JSON.stringify(JSON.parse(response), null, 2);
+                    } catch {
+                      return response;
+                    }
+                  })()}
+                </pre>
+              )
+            ) : (
+              <div className="p-6 text-center text-gray-500">
+                No response yet. Send a request to see the result.
+              </div>
+            )}
           </div>
         </div>
       </div>

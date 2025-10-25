@@ -88,8 +88,8 @@ export default function DashboardPage() {
   const menuItems = [
     { id: 'databases', label: 'Databases', icon: '🗄️' },
     { id: 'schema', label: 'Schema Explorer', icon: '🔍' },
-    { id: 'builder', label: 'API Builder', icon: '🔧' },
-    { id: 'unified', label: 'Unified API', icon: '🔗' },
+    { id: 'builder', label: 'My APIs', icon: '📌' },
+    { id: 'unified', label: 'API Explorer', icon: '🔍' },
     { id: 'tester', label: 'API Tester', icon: '🧪' },
     { id: 'docs', label: 'Documentation', icon: '📄' },
     { id: 'analytics', label: 'Analytics', icon: '📊' },
