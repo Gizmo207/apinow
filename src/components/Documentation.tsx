@@ -17,10 +17,72 @@ export function Documentation({ endpoints }: DocumentationProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const exportDocumentation = () => {
+    const markdown = generateMarkdownDocs();
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'api-documentation.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const generateMarkdownDocs = () => {
+    let markdown = '# API Documentation\n\n';
+    markdown += 'Complete documentation for all API endpoints.\n\n';
+    markdown += '---\n\n';
+
+    endpoints.forEach(endpoint => {
+      markdown += `## ${endpoint.method} ${endpoint.path}\n\n`;
+      markdown += `**${endpoint.name}**\n\n`;
+      markdown += `${endpoint.method === 'GET' ? 'Retrieve data from' : endpoint.method === 'POST' ? 'Create new record in' : endpoint.method === 'PUT' ? 'Update record in' : 'Delete record from'} the ${endpoint.tableName} table.\n\n`;
+      
+      if (endpoint.authRequired) {
+        markdown += '### Authentication\n\n';
+        markdown += 'This endpoint requires authentication. Include your Firebase ID token in the Authorization header.\n\n';
+        markdown += '```\nAuthorization: Bearer YOUR_FIREBASE_ID_TOKEN\n```\n\n';
+      }
+
+      markdown += '### Request\n\n';
+      markdown += '```bash\n';
+      markdown += `curl -X ${endpoint.method} "http://localhost:3000${endpoint.path}" \\\n`;
+      markdown += '  -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN" \\\n';
+      markdown += '  -H "Content-Type: application/json"\n';
+      markdown += '```\n\n';
+
+      markdown += '### Response (200 OK)\n\n';
+      markdown += '```json\n';
+      if (endpoint.tableName === 'users') {
+        markdown += JSON.stringify({
+          data: [{
+            id: "l66LVQLZH0U5RNvjJuxB1qfdvD83",
+            email: "user@example.com",
+            displayName: "John Doe",
+            createdAt: "2024-10-25T10:27:26.000Z",
+            updatedAt: "2024-10-25T10:27:26.000Z"
+          }]
+        }, null, 2);
+      } else {
+        markdown += JSON.stringify({
+          data: endpoint.method === 'GET' ? [{ id: '1', name: 'Example Record' }] : { id: '1', message: 'Operation successful' }
+        }, null, 2);
+      }
+      markdown += '\n```\n\n';
+
+      markdown += '---\n\n';
+    });
+
+    markdown += `\n*Generated on ${new Date().toLocaleDateString()}*\n`;
+    return markdown;
+  };
+
   const generateCodeExample = (language: string) => {
     if (!selectedEndpointData) return '';
     
-    const url = `https://api.apiflow.com${selectedEndpointData.path}`;
+    const url = `http://localhost:3000${selectedEndpointData.path}`;
     const method = selectedEndpointData.method;
     
     switch (language) {
@@ -29,7 +91,7 @@ export function Documentation({ endpoints }: DocumentationProps) {
 const response = await fetch('${url}', {
   method: '${method}',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
+    'Authorization': 'Bearer YOUR_FIREBASE_ID_TOKEN',
     'Content-Type': 'application/json'
   }${method !== 'GET' ? ',\n  body: JSON.stringify(data)' : ''}
 });
@@ -43,7 +105,7 @@ import requests
 
 url = '${url}'
 headers = {
-    'Authorization': 'Bearer YOUR_API_KEY',
+    'Authorization': 'Bearer YOUR_FIREBASE_ID_TOKEN',
     'Content-Type': 'application/json'
 }
 
@@ -54,7 +116,7 @@ print(result)`;
       case 'curl':
         return `# cURL
 curl -X ${method} "${url}" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN" \\
   -H "Content-Type: application/json"${method !== 'GET' ? ' \\\n  -d \'{"key": "value"}\'' : ''}`;
 
       default:
@@ -70,9 +132,12 @@ curl -X ${method} "${url}" \\
           <p className="text-gray-600">Complete documentation for all your APIs</p>
         </div>
         <div className="flex items-center space-x-3">
-          <button className="flex items-center space-x-2 text-blue-600 hover:text-blue-700">
+          <button 
+            onClick={exportDocumentation}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
             <Download className="w-4 h-4" />
-            <span>Export</span>
+            <span>Export as Markdown</span>
           </button>
         </div>
       </div>
@@ -129,7 +194,7 @@ curl -X ${method} "${url}" \\
                     {selectedEndpointData.method}
                   </span>
                   <code className="text-lg text-gray-700">
-                    https://api.apiflow.com{selectedEndpointData.path}
+                    http://localhost:3000{selectedEndpointData.path}
                   </code>
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
@@ -139,20 +204,20 @@ curl -X ${method} "${url}" \\
                   {selectedEndpointData.method === 'GET' ? 'Retrieve data from' :
                    selectedEndpointData.method === 'POST' ? 'Create new record in' :
                    selectedEndpointData.method === 'PUT' ? 'Update record in' :
-                   'Delete record from'} the {selectedEndpointData.table} table.
+                   'Delete record from'} the {selectedEndpointData.tableName} table.
                 </p>
               </div>
 
               {/* Authentication */}
-              {selectedEndpointData.authentication && (
+              {selectedEndpointData.authRequired && (
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <h3 className="font-semibold text-gray-900 mb-3">Authentication</h3>
                   <p className="text-gray-600 mb-3">
-                    This endpoint requires API key authentication. Include your API key in the Authorization header.
+                    This endpoint requires authentication. Include your Firebase ID token in the Authorization header.
                   </p>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <code className="text-sm text-gray-700">
-                      Authorization: Bearer YOUR_API_KEY
+                      Authorization: Bearer YOUR_FIREBASE_ID_TOKEN
                     </code>
                   </div>
                 </div>
@@ -216,22 +281,33 @@ curl -X ${method} "${url}" \\
                 <div className="mb-4">
                   <h4 className="font-medium text-gray-700 mb-2">Success Response (200)</h4>
                   <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
-                    <pre className="text-sm">{JSON.stringify({
-                      status: 'success',
-                      data: selectedEndpointData.method === 'GET' ? [
-                        { id: 1, name: 'Example Record' }
-                      ] : { id: 1, message: 'Operation successful' }
-                    }, null, 2)}</pre>
+                    <pre className="text-sm">{selectedEndpointData.tableName === 'users' ? 
+                      JSON.stringify({
+                        data: [
+                          {
+                            id: "l66LVQLZH0U5RNvjJuxB1qfdvD83",
+                            email: "user@example.com",
+                            displayName: "John Doe",
+                            createdAt: "2024-10-25T10:27:26.000Z",
+                            updatedAt: "2024-10-25T10:27:26.000Z"
+                          }
+                        ]
+                      }, null, 2)
+                      : JSON.stringify({
+                        data: selectedEndpointData.method === 'GET' ? [
+                          { id: '1', name: 'Example Record' }
+                        ] : { id: '1', message: 'Operation successful' }
+                      }, null, 2)
+                    }</pre>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Error Response (400)</h4>
+                  <h4 className="font-medium text-gray-700 mb-2">Error Response (401)</h4>
                   <div className="bg-gray-900 text-red-400 p-4 rounded-lg overflow-x-auto">
                     <pre className="text-sm">{JSON.stringify({
-                      status: 'error',
-                      message: 'Invalid request parameters',
-                      code: 400
+                      error: 'Unauthorized',
+                      message: 'Authentication required. Please provide a valid Bearer token in the Authorization header.'
                     }, null, 2)}</pre>
                   </div>
                 </div>
