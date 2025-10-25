@@ -15,6 +15,9 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebaseConfig';
 
+// Export auth for use in other components
+export { auth };
+
 export interface DatabaseConnection {
   id: string;
   userId: string;

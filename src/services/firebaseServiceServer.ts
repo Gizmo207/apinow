@@ -23,6 +23,14 @@ function getOurFirestoreAdmin() {
   }
 }
 
+/**
+ * Get Firestore instance for our app
+ */
+export function getOurFirestore() {
+  const app = getOurFirestoreAdmin();
+  return app.firestore();
+}
+
 export interface APIEndpoint {
   id: string;
   userId: string;

@@ -1,16 +1,39 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Key, Shield, Bell, User } from 'lucide-react';
+import { Settings as SettingsIcon, Key, Shield, Bell, User, Code, Copy, Check } from 'lucide-react';
+import { auth } from '@/services/firebaseService';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [token, setToken] = useState('');
+  const [gettingToken, setGettingToken] = useState(false);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
+    { id: 'developer', label: 'Developer Tools', icon: Code },
     { id: 'api-keys', label: 'API Keys', icon: Key },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'account', label: 'Account', icon: User },
   ];
+
+  const getMyToken = async () => {
+    setGettingToken(true);
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const idToken = await user.getIdToken();
+        setToken(idToken);
+        navigator.clipboard.writeText(idToken);
+        setTokenCopied(true);
+        setTimeout(() => setTokenCopied(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to get token:', error);
+    } finally {
+      setGettingToken(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -90,6 +113,74 @@ export function Settings() {
                       </label>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'developer' && (
+            <div className="space-y-6">
+              <h2 className="text-lg font-semibold text-gray-900">Developer Tools</h2>
+              
+              <div className="space-y-6">
+                <div className="border border-blue-200 rounded-lg p-6 bg-blue-50">
+                  <h3 className="font-medium text-gray-900 mb-2">🔑 Get My Firebase ID Token</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Click the button below to get your Firebase authentication token. This token will be automatically copied to your clipboard.
+                  </p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    <strong>Use this token to run the analytics test script:</strong>
+                  </p>
+                  <code className="block bg-gray-900 text-green-400 p-3 rounded-md text-sm mb-4">
+                    node test-analytics.js YOUR_TOKEN_HERE
+                  </code>
+                  
+                  <button
+                    onClick={getMyToken}
+                    disabled={gettingToken}
+                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+                  >
+                    {tokenCopied ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        <span>Token Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-5 h-5" />
+                        <span>{gettingToken ? 'Getting Token...' : 'Get My Token'}</span>
+                      </>
+                    )}
+                  </button>
+
+                  {token && (
+                    <div className="mt-4 p-3 bg-white rounded-md border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-1">Your Token (already copied to clipboard):</p>
+                      <code className="text-xs text-gray-700 break-all">{token}</code>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border border-gray-200 rounded-lg p-6">
+                  <h3 className="font-medium text-gray-900 mb-2">📊 Analytics Test Script</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Run the test script to generate 100 API requests and see your analytics in action:
+                  </p>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+                    <li>Click "Get My Token" button above</li>
+                    <li>Open a terminal in your project root</li>
+                    <li>Run: <code className="bg-gray-100 px-2 py-1 rounded">node test-analytics.js [paste-token-here]</code></li>
+                    <li>Watch the script make 100 requests</li>
+                    <li>Go to Analytics page to see the data!</li>
+                  </ol>
+                </div>
+
+                <div className="border border-yellow-200 rounded-lg p-6 bg-yellow-50">
+                  <h3 className="font-medium text-yellow-900 mb-2">⚠️ Security Note</h3>
+                  <p className="text-sm text-yellow-700">
+                    Your Firebase ID token is sensitive. Never share it publicly or commit it to version control. 
+                    Tokens expire after 1 hour and will be automatically refreshed by Firebase.
+                  </p>
                 </div>
               </div>
             </div>

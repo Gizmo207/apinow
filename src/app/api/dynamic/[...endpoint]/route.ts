@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { UnifiedDatabaseService } from '@/utils/unifiedDatabase';
 import { getEndpointByPath, getConnectionById } from '@/services/firebaseServiceServer';
 import { verifyAuthToken } from '@/lib/serverAuth';
+import { logApiRequest } from '@/services/analyticsService';
 
 /**
  * Dynamic API Route Handler
@@ -53,17 +54,34 @@ async function handleDynamicRequest(
   params: { endpoint: string[] },
   method: string
 ) {
+  const startTime = Date.now();
+  let userId: string | null = null;
+  let statusCode = 200;
+  const requestedPath = `/api/dynamic/${params.endpoint.join('/')}`;
+  
   try {
     // Construct the requested path
-    const requestedPath = `/api/dynamic/${params.endpoint.join('/')}`;
     console.log(`Dynamic API request: ${method} ${requestedPath}`);
 
     // Verify authentication
-    let userId: string;
     try {
       const authContext = await verifyAuthToken(request);
       userId = authContext.userId;
     } catch (error) {
+      statusCode = 401;
+      const responseTime = Date.now() - startTime;
+      
+      // Log analytics for failed auth
+      logApiRequest({
+        endpoint: requestedPath,
+        method,
+        statusCode,
+        responseTime,
+        userId: null,
+        success: false,
+        userAgent: request.headers.get('user-agent') || undefined,
+      }).catch(console.error);
+      
       return NextResponse.json(
         { 
           error: 'Unauthorized',
@@ -205,6 +223,18 @@ async function handleDynamicRequest(
         );
     }
 
+    // Log successful analytics
+    const responseTime = Date.now() - startTime;
+    logApiRequest({
+      endpoint: requestedPath,
+      method,
+      statusCode: 200,
+      responseTime,
+      userId,
+      success: true,
+      userAgent: request.headers.get('user-agent') || undefined,
+    }).catch(console.error);
+
     // Return successful response
     return NextResponse.json({
       success: true,
@@ -215,6 +245,20 @@ async function handleDynamicRequest(
 
   } catch (error) {
     console.error('Dynamic API handler error:', error);
+    
+    // Log error analytics
+    statusCode = 500;
+    const responseTime = Date.now() - startTime;
+    logApiRequest({
+      endpoint: requestedPath,
+      method,
+      statusCode,
+      responseTime,
+      userId,
+      success: false,
+      userAgent: request.headers.get('user-agent') || undefined,
+    }).catch(console.error);
+    
     return NextResponse.json(
       {
         error: 'Internal server error',
