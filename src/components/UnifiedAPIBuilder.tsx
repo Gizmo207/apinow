@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database, Play, Code, CheckCircle, XCircle, Loader, Save, Check } from 'lucide-react';
+import { Database, Play, Code, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { UnifiedDatabaseService } from '../utils/unifiedDatabase';
 import { DatabaseConnection } from '../utils/database';
 import { APIEndpoint } from '../lib/apiGenerator';
@@ -14,9 +14,6 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<Map<string, any>>(new Map());
   const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null);
-  const [savingEndpoint, setSavingEndpoint] = useState<string | null>(null);
-  const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
-  const [viewModes, setViewModes] = useState<Map<string, 'pretty' | 'raw'>>(new Map());
 
   const unifiedService = UnifiedDatabaseService.getInstance();
 
@@ -25,21 +22,6 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       setSelectedDatabase(databases[0]);
     }
   }, [databases, selectedDatabase]);
-
-  // Load saved endpoints
-  useEffect(() => {
-    const loadSavedEndpoints = async () => {
-      try {
-        const { FirebaseService } = await import('../services/firebaseService');
-        const firebaseService = FirebaseService.getInstance();
-        const saved = await firebaseService.getEndpoints();
-        setSavedEndpoints(saved);
-      } catch (error) {
-        console.error('Failed to load saved endpoints:', error);
-      }
-    };
-    loadSavedEndpoints();
-  }, []);
 
   const handleDatabaseSelect = async (database: DatabaseConnection) => {
     setSelectedDatabase(database);
@@ -59,91 +41,14 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       
       // Generate API endpoints
       const generatedEndpoints = await unifiedService.generateAPIEndpoints(database.id);
-      console.log(`🔍 Generated ${generatedEndpoints.length} total endpoints`);
+      setEndpoints(generatedEndpoints);
       
-      // Check for duplicate IDs (debugging)
-      const ids = generatedEndpoints.map(ep => ep.id);
-      const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
-      if (duplicateIds.length > 0) {
-        console.warn('⚠️ Found duplicate endpoint IDs:', duplicateIds);
-      }
-      
-      // Filter out endpoints that are already saved
-      const unsavedEndpoints = generatedEndpoints.filter(endpoint => {
-        const endpointPath = `/api/dynamic${endpoint.path}`;
-        const isAlreadySaved = savedEndpoints.some(saved => saved.path === endpointPath);
-        if (isAlreadySaved) {
-          console.log(`⏭️ Skipping already saved: ${endpoint.method} ${endpointPath}`);
-        }
-        return !isAlreadySaved;
-      });
-      
-      setEndpoints(unsavedEndpoints);
-      
-      const filteredCount = generatedEndpoints.length - unsavedEndpoints.length;
-      if (filteredCount > 0) {
-        console.log(`✨ Showing ${unsavedEndpoints.length} new endpoints (${filteredCount} already saved)`);
-      } else {
-        console.log(`✨ Generated ${unsavedEndpoints.length} endpoints for ${database.name}`);
-      }
+      console.log(`Generated ${generatedEndpoints.length} endpoints for ${database.name}`);
     } catch (error) {
       console.error('Failed to generate endpoints:', error);
       setEndpoints([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const saveEndpoint = async (endpoint: APIEndpoint) => {
-    if (!selectedDatabase) return;
-    
-    // Prevent double-clicking by checking if already saving
-    if (savingEndpoint === endpoint.id) {
-      console.log('Already saving this endpoint, ignoring duplicate click');
-      return;
-    }
-    
-    setSavingEndpoint(endpoint.id);
-    console.log(`🔄 Saving endpoint: ${endpoint.method} ${endpoint.path} (ID: ${endpoint.id})`);
-    
-    try {
-      const { FirebaseService } = await import('../services/firebaseService');
-      const firebaseService = FirebaseService.getInstance();
-      
-      const endpointConfig = {
-        name: endpoint.description || `${endpoint.method} ${endpoint.collection}`,
-        path: `/api/dynamic${endpoint.path}`,
-        method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
-        tableName: endpoint.collection,
-        connectionId: selectedDatabase.id,
-        authRequired: true,
-        filters: [],
-        rateLimit: 100,
-        isActive: true
-      };
-
-      console.log(`💾 Saving to Firestore:`, endpointConfig);
-      const savedEndpoint = await firebaseService.saveEndpoint(endpointConfig);
-      
-      // Update saved endpoints list
-      setSavedEndpoints(prev => {
-        const updated = [...prev, savedEndpoint];
-        console.log(`✅ Updated saved endpoints count: ${updated.length}`);
-        return updated;
-      });
-      
-      // Remove the saved endpoint from the current list
-      setEndpoints(prev => {
-        const filtered = prev.filter(ep => ep.id !== endpoint.id);
-        console.log(`📝 Remaining endpoints in list: ${filtered.length}`);
-        return filtered;
-      });
-      
-      console.log(`✅ Successfully saved: ${endpointConfig.path}`);
-    } catch (error) {
-      console.error('❌ Failed to save endpoint:', error);
-    } finally {
-      setSavingEndpoint(null);
     }
   };
 
@@ -250,140 +155,26 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
     }
   };
 
-  const formatValue = (value: any): string => {
-    // Handle Firestore timestamps
-    if (typeof value === 'object' && value !== null) {
-      if (value.seconds !== undefined && value.nanoseconds !== undefined) {
-        const date = new Date(value.seconds * 1000);
-        return date.toLocaleString();
-      }
-      if (value._seconds !== undefined) {
-        const date = new Date(value._seconds * 1000);
-        return date.toLocaleString();
-      }
-    }
-    
-    // Handle other types
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-  };
-
-  const renderPrettyView = (data: any) => {
-    try {
-      // Case 1: Array of objects - render as table
-      if (Array.isArray(data) && data.length > 0) {
-        const headers = Object.keys(data[0] || {});
-        
-        return (
-          <div className="overflow-auto max-h-64 mt-2">
-            <table className="min-w-full border-collapse text-xs">
-              <thead className="bg-gray-100 sticky top-0">
-                <tr>
-                  {headers.map(header => (
-                    <th key={header} className="border border-gray-300 px-2 py-1 text-left font-semibold text-gray-700">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((row: any, rowIndex: number) => (
-                  <tr key={rowIndex} className="hover:bg-gray-50">
-                    {headers.map(header => (
-                      <td key={header} className="border border-gray-300 px-2 py-1 text-gray-600">
-                        {formatValue(row[header])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      }
-      
-      // Case 2: Single object - render as key-value pairs
-      if (typeof data === 'object' && data !== null) {
-        return (
-          <div className="overflow-auto max-h-64 space-y-1 p-2 mt-2 text-xs">
-            {Object.entries(data).map(([key, value]) => (
-              <div key={key} className="flex border-b border-gray-200 pb-1">
-                <span className="font-semibold text-gray-700 w-1/3">{key}:</span>
-                <span className="text-gray-600 w-2/3 break-all">{formatValue(value)}</span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-      
-      // Fallback: render as formatted JSON
-      return (
-        <pre className="text-xs overflow-x-auto mt-2 p-2 bg-gray-50 rounded">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      );
-    } catch (error) {
-      return (
-        <pre className="text-xs overflow-x-auto mt-2 p-2">
-          {String(data)}
-        </pre>
-      );
-    }
-  };
-
   const renderTestResult = (endpointId: string) => {
     const result = testResults.get(endpointId);
     if (!result) return null;
 
-    const viewMode = viewModes.get(endpointId) || 'pretty';
-
     return (
-      <div className={`mt-2 p-3 rounded ${result.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+      <div className={`mt-2 p-2 rounded text-sm ${result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
         {result.success ? (
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="font-medium text-green-800 text-sm">Test Successful</span>
-              </div>
-              {/* Pretty/Raw Toggle */}
-              <div className="flex gap-1 bg-white rounded p-1">
-                <button
-                  onClick={() => setViewModes(prev => new Map(prev.set(endpointId, 'pretty')))}
-                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                    viewMode === 'pretty'
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Pretty
-                </button>
-                <button
-                  onClick={() => setViewModes(prev => new Map(prev.set(endpointId, 'raw')))}
-                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                    viewMode === 'raw'
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Raw
-                </button>
-              </div>
+            <div className="flex items-center gap-1 mb-1">
+              <CheckCircle className="w-4 h-4" />
+              <span className="font-medium">Success</span>
             </div>
-            {viewMode === 'pretty' ? (
-              renderPrettyView(result.data)
-            ) : (
-              <pre className="text-xs overflow-x-auto p-2 bg-white rounded">
-                {JSON.stringify(result.data, null, 2)}
-              </pre>
-            )}
+            <pre className="text-xs overflow-x-auto">
+              {JSON.stringify(result.data, null, 2)}
+            </pre>
           </div>
         ) : (
-          <div className="flex items-center gap-1 text-red-800">
+          <div className="flex items-center gap-1">
             <XCircle className="w-4 h-4" />
-            <span className="text-sm">{result.error}</span>
+            <span>{result.error}</span>
           </div>
         )}
       </div>
@@ -393,32 +184,10 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">🔍 API Explorer</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Unified API Builder</h1>
         <p className="text-gray-600">
-          Browse auto-generated endpoints, test them, and save the ones you want to use
+          Generate and test REST APIs for any database type using the unified connector layer
         </p>
-        {savedEndpoints.length > 0 && (
-          <div className="mt-3 flex items-center gap-2 text-sm">
-            <span className="text-gray-600">
-              💾 You have <strong>{savedEndpoints.length}</strong> saved {savedEndpoints.length === 1 ? 'API' : 'APIs'}
-            </span>
-            <a
-              href="#builder"
-              className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
-            >
-              View in My APIs →
-            </a>
-            <button
-              onClick={() => {
-                console.log('🔍 Current saved endpoints:', savedEndpoints);
-                console.log('📋 Saved endpoint paths:', savedEndpoints.map(ep => ep.path));
-              }}
-              className="text-xs text-gray-500 hover:text-gray-700 underline"
-            >
-              Debug Saved APIs
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Database Selection */}
@@ -451,14 +220,7 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
       {selectedDatabase && (
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold">Available API Endpoints</h2>
-              {!loading && endpoints.length > 0 && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {endpoints.length} new {endpoints.length === 1 ? 'endpoint' : 'endpoints'} ready to save
-                </p>
-              )}
-            </div>
+            <h2 className="text-lg font-semibold">Generated API Endpoints</h2>
             {loading && <Loader className="w-5 h-5 animate-spin text-blue-600" />}
           </div>
 
@@ -467,18 +229,8 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
               Generating endpoints...
             </div>
           ) : endpoints.length === 0 ? (
-            <div className="text-center py-12 bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-green-900 mb-2">All Endpoints Saved! 🎉</h3>
-              <p className="text-green-700 mb-4">
-                You've saved all available endpoints from this database.
-              </p>
-              <a
-                href="#builder"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                View My APIs →
-              </a>
+            <div className="text-center py-8 text-gray-500">
+              No endpoints available. Make sure the database is connected and has collections.
             </div>
           ) : (
             <div className="space-y-4">
@@ -496,35 +248,18 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
                         {endpoint.path}
                       </code>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => testEndpoint(endpoint)}
-                        disabled={testingEndpoint === endpoint.id}
-                        className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                      >
-                        {testingEndpoint === endpoint.id ? (
-                          <Loader className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Play className="w-4 h-4" />
-                        )}
-                        Test
-                      </button>
-                      <button
-                        onClick={() => saveEndpoint(endpoint)}
-                        disabled={savingEndpoint === endpoint.id || savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`)}
-                        className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                        title={savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? 'Already saved' : 'Save this endpoint'}
-                      >
-                        {savingEndpoint === endpoint.id ? (
-                          <Loader className="w-4 h-4 animate-spin" />
-                        ) : savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Save className="w-4 h-4" />
-                        )}
-                        {savedEndpoints.some(saved => saved.path === `/api/dynamic${endpoint.path}`) ? 'Saved' : 'Save'}
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => testEndpoint(endpoint)}
+                      disabled={testingEndpoint === endpoint.id}
+                      className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {testingEndpoint === endpoint.id ? (
+                        <Loader className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4" />
+                      )}
+                      Test
+                    </button>
                   </div>
                   
                   <p className="text-sm text-gray-600 mb-2">{endpoint.description}</p>

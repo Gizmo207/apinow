@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Database, Plus, Trash2, TestTube, CheckCircle, XCircle, Loader, Edit } from 'lucide-react';
 import { DatabaseManager } from '../utils/database';
-import { FirebaseService } from '../services/firebaseService';
+import { SupabaseService } from '../utils/supabase-service';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -30,7 +30,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     storageBucket: ''
   });
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
-  const [connectionResults, setConnectionResults] = useState<{ [key: string]: { status: 'success' | 'error'; message: string } | null }>({});
+  const [connectionResults, setConnectionResults] = useState<{ [key: string]: 'success' | 'error' | null }>({});
 
   const handleEdit = (database: any) => {
     setEditingDatabase(database);
@@ -94,18 +94,14 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
         createdAt: new Date().toISOString()
       };
       
-      const testResult = await dbManager.testConnection(tempConnection);
+      await dbManager.testConnection(tempConnection);
       
-      if (!testResult.success) {
-        throw new Error(testResult.message);
-      }
-      
-      // Connection successful, save to Firebase
-      const firebaseService = FirebaseService.getInstance();
+      // Connection successful, save to Supabase
+      const supabaseService = SupabaseService.getInstance();
       
       if (editingDatabase) {
         // Update existing connection
-        await firebaseService.updateConnection(editingDatabase.id, formData);
+        await supabaseService.updateConnection(editingDatabase.id, formData);
         
         // Update local database list
         const updatedDatabases = databases.map(db => 
@@ -123,43 +119,42 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
             : db
         );
         
-        setConnectionResults(prev => ({ ...prev, [editingDatabase.id]: { status: 'success', message: testResult.message } }));
+        setConnectionResults(prev => ({ ...prev, [editingDatabase.id]: 'success' }));
         onDatabasesChange(updatedDatabases);
       } else {
         // Create new connection
-        const savedConnection = await firebaseService.saveConnection(formData);
+        const savedConnection = await supabaseService.saveConnection(formData);
         
-        // Convert Firebase format to local format
+        // Convert Supabase format to local format
         const newDatabase = {
           id: savedConnection.id,
           name: savedConnection.name,
           type: savedConnection.type,
           host: savedConnection.host,
           port: savedConnection.port,
-          database: savedConnection.databaseName,
+          database: savedConnection.database_name,
           username: savedConnection.username,
-          password: savedConnection.encryptedPassword,
-          projectId: savedConnection.projectId,
-          apiKey: savedConnection.apiKey,
-          authDomain: savedConnection.authDomain,
+          password: savedConnection.encrypted_password,
+          projectId: savedConnection.project_id,
+          apiKey: savedConnection.api_key,
+          authDomain: savedConnection.auth_domain,
           // Firebase Admin SDK fields
-          serviceAccountKey: savedConnection.serviceAccountKey,
-          adminApiKey: savedConnection.adminApiKey,
-          adminAuthDomain: savedConnection.adminAuthDomain,
-          databaseURL: savedConnection.databaseURL,
-          storageBucket: savedConnection.storageBucket,
+          serviceAccountKey: savedConnection.service_account_key,
+          adminApiKey: savedConnection.admin_api_key,
+          adminAuthDomain: savedConnection.admin_auth_domain,
+          databaseURL: savedConnection.database_url,
+          storageBucket: savedConnection.storage_bucket,
           connected: true,
-          createdAt: savedConnection.createdAt
+          createdAt: savedConnection.created_at
         };
         
-        setConnectionResults(prev => ({ ...prev, [newDatabase.id]: { status: 'success', message: testResult.message } }));
+        setConnectionResults(prev => ({ ...prev, [newDatabase.id]: 'success' }));
         onDatabasesChange([...databases, newDatabase]);
       }
       
       resetForm();
     } catch (error) {
-      console.error('Failed to save connection:', error);
-      setConnectionResults(prev => ({ ...prev, [testId]: { status: 'error', message: error instanceof Error ? error.message : 'Connection failed' } }));
+      setConnectionResults(prev => ({ ...prev, [testId]: 'error' }));
       console.error('Connection failed:', error);
     } finally {
       setTestingConnection(null);
@@ -170,13 +165,8 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     setTestingConnection(database.id);
     try {
       const dbManager = DatabaseManager.getInstance();
-      const testResult = await dbManager.testConnection(database);
-      
-      if (!testResult.success) {
-        throw new Error(testResult.message);
-      }
-      
-      setConnectionResults(prev => ({ ...prev, [database.id]: { status: 'success', message: testResult.message } }));
+      await dbManager.testConnection(database);
+      setConnectionResults(prev => ({ ...prev, [database.id]: 'success' }));
       
       // Update database status
       const updatedDatabases = databases.map(db => 
@@ -184,7 +174,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
       );
       onDatabasesChange(updatedDatabases);
     } catch (error) {
-      setConnectionResults(prev => ({ ...prev, [database.id]: { status: 'error', message: error instanceof Error ? error.message : 'Connection test failed. Please check your credentials.' } }));
+      setConnectionResults(prev => ({ ...prev, [database.id]: 'error' }));
       console.error('Connection test failed:', error);
     } finally {
       setTestingConnection(null);
@@ -193,8 +183,8 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
 
   const handleDelete = async (id: string) => {
     try {
-      const firebaseService = FirebaseService.getInstance();
-      await firebaseService.deleteConnection(id);
+      const supabaseService = SupabaseService.getInstance();
+      await supabaseService.deleteConnection(id);
       
       onDatabasesChange(databases.filter(db => db.id !== id));
       setConnectionResults(prev => {
@@ -213,9 +203,9 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
     }
     
     const result = connectionResults[database.id];
-    if (result?.status === 'success') {
+    if (result === 'success') {
       return <CheckCircle className="w-4 h-4 text-green-500" />;
-    } else if (result?.status === 'error') {
+    } else if (result === 'error') {
       return <XCircle className="w-4 h-4 text-red-500" />;
     }
     
@@ -242,9 +232,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
 
       {showAddForm && (
         <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold mb-4">
-            {editingDatabase ? 'Edit Database Connection' : 'Add New Database Connection'}
-          </h3>
+          <h3 className="text-lg font-semibold mb-4">Add New Database Connection</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -469,7 +457,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={resetForm}
+                onClick={() => setShowAddForm(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
@@ -479,7 +467,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                 disabled={testingConnection !== null}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                {testingConnection ? 'Testing...' : editingDatabase ? 'Update Database' : 'Add Database'}
+                {testingConnection ? 'Testing...' : 'Add Database'}
               </button>
             </div>
           </form>
@@ -537,7 +525,7 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                     <span>Test</span>
                   </button>
                   <button
-                    onClick={() => handleEdit(database)}
+                    onClick={() => console.log('Edit clicked:', database)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                     aria-label={`Edit ${database.name} connection`}
                     title="Edit Connection"
@@ -555,18 +543,18 @@ export function DatabaseConnector({ databases, onDatabasesChange }: DatabaseConn
                 </div>
               </div>
               
-              {connectionResults[database.id]?.status === 'success' && (
+              {connectionResults[database.id] === 'success' && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-sm text-green-800">
-                    ✅ {connectionResults[database.id]?.message || 'Connection successful!'}
+                    ✅ Connection successful! Sample data has been created.
                   </p>
                 </div>
               )}
               
-              {connectionResults[database.id]?.status === 'error' && (
+              {connectionResults[database.id] === 'error' && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-800">
-                    ❌ {connectionResults[database.id]?.message || 'Connection test failed. Please check your credentials.'}
+                    ❌ Connection failed. Please check your database settings.
                   </p>
                 </div>
               )}
