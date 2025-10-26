@@ -37,9 +37,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ apiKeys });
   } catch (error) {
     console.error('[API Keys] Failed to get keys:', error);
+    
+    // Check if it's a Firebase initialization error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('service account') || errorMessage.includes('credential')) {
+      return NextResponse.json(
+        { 
+          error: 'Firebase service not configured',
+          message: 'FIREBASE_SERVICE_ACCOUNT_KEY environment variable is missing. Please contact support.',
+          apiKeys: [] // Return empty array so UI doesn't break
+        },
+        { status: 200 } // Return 200 with empty array instead of 500
+      );
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to get API keys' },
-      { status: 500 }
+      { error: 'Failed to get API keys', message: errorMessage, apiKeys: [] },
+      { status: 200 } // Return 200 with empty array instead of 500
     );
   }
 }
