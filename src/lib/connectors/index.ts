@@ -3,6 +3,7 @@ import { DatabaseAdapter, DatabaseConfig } from './types';
 import { FirestoreAdapter } from './firestore';
 import { SQLiteAdapter } from './sqlite';
 import { PostgresAdapter } from './postgres';
+import { MySQLAdapter } from './mysql';
 
 export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseAdapter> {
   switch (config.type) {
@@ -18,8 +19,9 @@ export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseA
       return pgAdapter;
     
     case 'mysql':
-      // TODO: Implement MySQLAdapter
-      throw new Error('MySQL adapter not yet implemented');
+      const mysqlAdapter = new MySQLAdapter(config);
+      await mysqlAdapter.connect();
+      return mysqlAdapter;
     
     case 'mongo':
       // TODO: Implement MongoAdapter
@@ -34,3 +36,4 @@ export type { DatabaseAdapter, DatabaseConfig } from './types';
 export { FirestoreAdapter } from './firestore';
 export { SQLiteAdapter } from './sqlite';
 export { PostgresAdapter } from './postgres';
+export { MySQLAdapter } from './mysql';
