@@ -57,7 +57,8 @@ export function APITester() {
     setSelectedEndpoint(endpointId);
     const endpoint = savedEndpoints.find(ep => ep.id === endpointId);
     if (endpoint) {
-      setUrl(`http://localhost:3000${endpoint.path}`);
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      setUrl(`${origin}${endpoint.path}`);
       setMethod(endpoint.method);
     }
   };
@@ -78,13 +79,17 @@ export function APITester() {
       let parsedHeaders = JSON.parse(headers);
       console.log('Initial headers:', parsedHeaders);
       
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const isSameOrigin = url.startsWith(currentOrigin) || url.includes('localhost') || url.startsWith('/');
+      
       debugLog += `useAuth: ${useAuth}\n`;
       debugLog += `URL: ${url}\n`;
-      debugLog += `Includes localhost: ${url.includes('localhost')}\n`;
+      debugLog += `Current origin: ${currentOrigin}\n`;
+      debugLog += `Same origin: ${isSameOrigin}\n`;
       
-      // Add auth token if enabled and URL is localhost
-      if (useAuth && url.includes('localhost')) {
-        console.log('[API Tester] ✅ Auth is ENABLED and URL is localhost');
+      // Add auth token if enabled and URL is same origin
+      if (useAuth && isSameOrigin) {
+        console.log('[API Tester] ✅ Auth is ENABLED and URL is same-origin');
         console.log('[API Tester] Getting auth headers...');
         debugLog += '✅ Getting auth headers...\n';
         
@@ -97,9 +102,9 @@ export function APITester() {
           ...authHeaders
         };
       } else {
-        console.log('[API Tester] ❌ Auth disabled or not localhost URL');
+        console.log('[API Tester] ❌ Auth disabled or not same-origin URL');
         console.log('  - useAuth:', useAuth);
-        console.log('  - includes localhost:', url.includes('localhost'));
+        console.log('  - isSameOrigin:', isSameOrigin);
         debugLog += '❌ Auth NOT added\n';
       }
       
@@ -319,7 +324,7 @@ export function APITester() {
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
             <label htmlFor="useAuth" className="text-sm text-gray-700">
-              Include authentication (auto-adds Bearer token for localhost)
+              Include authentication (auto-adds Bearer token for same-origin requests)
             </label>
           </div>
 

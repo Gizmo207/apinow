@@ -294,7 +294,10 @@ export function MyAPIs() {
             Go to API Explorer to browse and save auto-generated endpoints
           </p>
           <button
-            onClick={() => window.location.hash = '#unified'}
+            onClick={() => {
+              window.location.hash = '#unified';
+              window.dispatchEvent(new HashChangeEvent('hashchange'));
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Go to API Explorer
@@ -413,7 +416,7 @@ export function MyAPIs() {
                       {endpoint.isPublic ? 'Copy Public URL' : 'Copy URL'}
                     </button>
                     <a
-                      href={`#tester?url=${encodeURIComponent(`http://localhost:3000${endpoint.path}`)}`}
+                      href={`#tester?url=${encodeURIComponent(`${window.location.origin}${endpoint.path}`)}`}
                       className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                     >
                       <Zap className="w-4 h-4" />
