@@ -447,13 +447,20 @@ export function MyAPIs() {
                       <ExternalLink className="w-4 h-4" />
                       {endpoint.isPublic ? 'Copy Public URL' : 'Copy URL'}
                     </button>
-                    <a
-                      href={`#tester?url=${encodeURIComponent(`${window.location.origin}${endpoint.path}`)}`}
-                      className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                    >
-                      <Zap className="w-4 h-4" />
-                      Test in API Tester
-                    </a>
+                    {!endpoint.path.includes(':id') && (
+                      <a
+                        href={`#tester?url=${encodeURIComponent(`${window.location.origin}${endpoint.path}`)}`}
+                        className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                      >
+                        <Zap className="w-4 h-4" />
+                        Test in API Tester
+                      </a>
+                    )}
+                    {endpoint.path.includes(':id') && (
+                      <span className="text-xs text-gray-500 italic px-3 py-1">
+                        Requires ID parameter
+                      </span>
+                    )}
                   </div>
                 </div>
 

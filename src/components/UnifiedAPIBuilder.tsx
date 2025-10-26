@@ -98,13 +98,6 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
 
       const { FirebaseService } = await import("../services/firebaseService");
       
-      // Don't save endpoints with :id parameter placeholders
-      if (endpoint.path.includes(':id')) {
-        console.log('[UnifiedAPIBuilder] Skipping endpoint with :id parameter:', endpoint.path);
-        setEndpoints(prev => prev.filter(e => e.id !== endpoint.id));
-        return;
-      }
-      
       const savedEndpoint = await FirebaseService.getInstance().saveEndpoint({
         name: endpoint.description || `${endpoint.method} ${endpoint.collection}`,
         path: `/api/dynamic${endpoint.path}`,
