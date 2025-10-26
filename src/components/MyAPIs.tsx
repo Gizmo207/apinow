@@ -314,7 +314,7 @@ export function MyAPIs() {
                         <div className="flex items-start gap-1">
                           <span className="font-medium">Public URL:</span>
                           <code className="flex-1 bg-white px-2 py-1 rounded text-xs break-all">
-                            {`${window.location.origin}/api/public${endpoint.path}`}
+                            {`${window.location.origin}/api/public${endpoint.path.replace('/api/dynamic', '')}`}
                           </code>
                         </div>
                         {apiKeys.length > 0 && (
@@ -330,7 +330,7 @@ export function MyAPIs() {
                       </div>
                     ) : (
                       <div className="text-xs text-gray-600">
-                        <div>Protected URL: <code className="bg-white px-1 rounded">{`${window.location.origin}/api/dynamic${endpoint.path}`}</code></div>
+                        <div>Protected URL: <code className="bg-white px-1 rounded">{`${window.location.origin}${endpoint.path}`}</code></div>
                         <div className="text-gray-500 mt-1">Only accessible with Firebase authentication</div>
                       </div>
                     )}
@@ -340,9 +340,10 @@ export function MyAPIs() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {
+                        const cleanPath = endpoint.path.replace('/api/dynamic', '');
                         const url = endpoint.isPublic 
-                          ? `${window.location.origin}/api/public${endpoint.path}${apiKeys.length > 0 ? `?key=${apiKeys[0].key}` : '?key=YOUR_KEY'}`
-                          : `${window.location.origin}/api/dynamic${endpoint.path}`;
+                          ? `${window.location.origin}/api/public${cleanPath}${apiKeys.length > 0 ? `?key=${apiKeys[0].key}` : '?key=YOUR_KEY'}`
+                          : `${window.location.origin}${endpoint.path}`;
                         const success = await copyToClipboard(url);
                         if (success) {
                           showToast(`${endpoint.isPublic ? 'Public' : 'Protected'} URL copied!`, 'success');

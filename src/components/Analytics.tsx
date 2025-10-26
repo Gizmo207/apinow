@@ -15,6 +15,7 @@ export function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'protected' | 'public'>('all');
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -22,7 +23,10 @@ export function Analytics() {
     
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch('/api/analytics', { headers });
+      const url = sourceFilter === 'all' 
+        ? '/api/analytics'
+        : `/api/analytics?source=${sourceFilter}`;
+      const response = await fetch(url, { headers });
       
       if (!response.ok) {
         throw new Error('Failed to fetch analytics');
@@ -39,7 +43,7 @@ export function Analytics() {
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [sourceFilter]); // Re-fetch when filter changes
 
   if (loading && !data) {
     return (
@@ -54,19 +58,56 @@ export function Analytics() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-1">Monitor your API performance and usage</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+            <p className="text-gray-600 mt-1">Monitor your API performance and usage</p>
+          </div>
+          <button
+            onClick={fetchAnalytics}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          disabled={loading}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
-        </button>
+
+        {/* Source Filter */}
+        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200 inline-flex">
+          <span className="text-sm font-medium text-gray-700">Filter by Source:</span>
+          <button
+            onClick={() => setSourceFilter('all')}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+              sourceFilter === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All Requests
+          </button>
+          <button
+            onClick={() => setSourceFilter('protected')}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1 ${
+              sourceFilter === 'protected'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            🔒 Protected
+          </button>
+          <button
+            onClick={() => setSourceFilter('public')}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1 ${
+              sourceFilter === 'public'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            🌍 Public
+          </button>
+        </div>
       </div>
 
       {error && (

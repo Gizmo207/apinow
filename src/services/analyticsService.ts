@@ -34,7 +34,7 @@ export async function logApiRequest(data: AnalyticsLog): Promise<void> {
 /**
  * Get analytics data for the dashboard
  */
-export async function getAnalytics(userId: string) {
+export async function getAnalytics(userId: string, source?: 'protected' | 'public') {
   try {
     const firestore = getOurFirestore();
     const now = new Date();
@@ -49,7 +49,7 @@ export async function getAnalytics(userId: string) {
       .get();
     
     // Convert and filter logs
-    const allLogs = logsSnapshot.docs.map(doc => {
+    let allLogs = logsSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -59,9 +59,15 @@ export async function getAnalytics(userId: string) {
         responseTime: data.responseTime,
         userId: data.userId,
         success: data.success,
+        source: data.source || 'protected', // Default to protected for old logs
         timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
       };
     });
+    
+    // Filter by source if specified
+    if (source) {
+      allLogs = allLogs.filter(log => log.source === source);
+    }
     
     // Filter by last 30 days and sort by timestamp
     const logs = allLogs

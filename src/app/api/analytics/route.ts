@@ -8,8 +8,13 @@ export async function GET(request: NextRequest) {
     const authContext = await verifyAuthToken(request);
     const userId = authContext.userId;
 
-    // Get analytics data
-    const analytics = await getAnalytics(userId);
+    // Get source filter from query params
+    const { searchParams } = new URL(request.url);
+    const sourceParam = searchParams.get('source');
+    const source = (sourceParam === 'protected' || sourceParam === 'public') ? sourceParam : undefined;
+
+    // Get analytics data with optional source filter
+    const analytics = await getAnalytics(userId, source);
 
     return NextResponse.json(analytics);
   } catch (error) {
