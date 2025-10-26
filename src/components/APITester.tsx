@@ -71,6 +71,17 @@ export function APITester() {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
       setUrl(`${origin}${endpoint.path}`);
       setMethod(endpoint.method);
+      
+      // Auto-fill body for POST requests
+      if (endpoint.method === 'POST') {
+        setBody(JSON.stringify({
+          name: "Test Document",
+          description: "Created via API Tester",
+          createdAt: new Date().toISOString()
+        }, null, 2));
+      } else {
+        setBody('');
+      }
     }
   };
 
@@ -270,11 +281,13 @@ export function APITester() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Select an endpoint --</option>
-                {savedEndpoints.map((ep) => (
-                  <option key={ep.id} value={ep.id}>
-                    {ep.method} - {ep.name} ({ep.path})
-                  </option>
-                ))}
+                {savedEndpoints
+                  .filter(ep => !ep.path.includes(':id')) // Only show testable endpoints
+                  .map((ep) => (
+                    <option key={ep.id} value={ep.id}>
+                      {ep.method} - {ep.name} ({ep.path})
+                    </option>
+                  ))}
               </select>
             </div>
           )}
