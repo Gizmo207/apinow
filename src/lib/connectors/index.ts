@@ -5,6 +5,7 @@ import { SQLiteAdapter } from './sqlite';
 import { PostgresAdapter } from './postgres';
 import { MySQLAdapter } from './mysql';
 import { MongoDBAdapter } from './mongodb';
+import { SQLServerAdapter } from './sqlserver';
 
 export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseAdapter> {
   switch (config.type) {
@@ -29,6 +30,11 @@ export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseA
       await mongoAdapter.connect();
       return mongoAdapter;
     
+    case 'sqlserver':
+      const sqlServerAdapter = new SQLServerAdapter(config);
+      await sqlServerAdapter.connect();
+      return sqlServerAdapter;
+    
     default:
       throw new Error(`Unsupported database type: ${config.type}`);
   }
@@ -40,3 +46,4 @@ export { SQLiteAdapter } from './sqlite';
 export { PostgresAdapter } from './postgres';
 export { MySQLAdapter } from './mysql';
 export { MongoDBAdapter } from './mongodb';
+export { SQLServerAdapter } from './sqlserver';
