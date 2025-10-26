@@ -39,6 +39,31 @@ export function MyAPIs() {
     }
   };
 
+  const deleteAllEndpoints = async () => {
+    if (!confirm('Are you sure you want to delete ALL saved endpoints? This cannot be undone.')) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { FirebaseService } = await import('../services/firebaseService');
+      const firebaseService = FirebaseService.getInstance();
+      
+      // Delete each endpoint
+      for (const endpoint of savedEndpoints) {
+        await firebaseService.deleteEndpoint(endpoint.id);
+      }
+      
+      setSavedEndpoints([]);
+      showToast('All endpoints deleted successfully', 'success');
+    } catch (error) {
+      console.error('Failed to delete all endpoints:', error);
+      showToast('Failed to delete endpoints', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadApiKeys = async () => {
     try {
       const { auth } = await import('../services/firebaseService');
@@ -254,6 +279,13 @@ export function MyAPIs() {
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
               📄 Download OpenAPI YAML
+            </button>
+            <button
+              onClick={deleteAllEndpoints}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete All Endpoints
             </button>
           </div>
         )}

@@ -31,6 +31,17 @@ export function APITester() {
       
       if (urlParam) {
         setUrl(urlParam);
+        
+        // Auto-select matching endpoint from dropdown
+        const matchingEndpoint = savedEndpoints.find(ep => {
+          const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+          const fullPath = `${origin}${ep.path}`;
+          return fullPath === urlParam && ep.method === (methodParam || method);
+        });
+        
+        if (matchingEndpoint) {
+          setSelectedEndpoint(matchingEndpoint.id);
+        }
       }
       if (methodParam) {
         setMethod(methodParam);
@@ -40,7 +51,7 @@ export function APITester() {
     loadFromHash();
     window.addEventListener('hashchange', loadFromHash);
     return () => window.removeEventListener('hashchange', loadFromHash);
-  }, []);
+  }, [savedEndpoints, method]);
 
   const loadSavedEndpoints = async () => {
     try {
