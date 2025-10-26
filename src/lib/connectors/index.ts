@@ -11,6 +11,7 @@ import { RedisAdapter } from './redis';
 import { MariaDBAdapter } from './mariadb';
 import { DynamoDBAdapter } from './dynamodb';
 import { OracleAdapter } from './oracle';
+import { CassandraAdapter } from './cassandra';
 
 export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseAdapter> {
   switch (config.type) {
@@ -65,6 +66,11 @@ export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseA
       await oracleAdapter.connect();
       return oracleAdapter;
     
+    case 'cassandra':
+      const cassandraAdapter = new CassandraAdapter(config);
+      await cassandraAdapter.connect();
+      return cassandraAdapter;
+    
     default:
       throw new Error(`Unsupported database type: ${config.type}`);
   }
@@ -82,3 +88,4 @@ export { RedisAdapter } from './redis';
 export { MariaDBAdapter } from './mariadb';
 export { DynamoDBAdapter } from './dynamodb';
 export { OracleAdapter } from './oracle';
+export { CassandraAdapter } from './cassandra';
