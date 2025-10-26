@@ -9,21 +9,25 @@ function getAuthAdmin() {
     if (!admin.apps.length || !admin.apps.find(app => app?.name === 'auth-app')) {
       console.log('[Server Auth] Initializing Firebase Admin for token verification');
       
-      try {
-        // Load service account from static import (Next.js compatible)
-        const serviceAccount = require('../../firebase-service-account.json');
-        
-        return admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          projectId: 'api-now-bd858',
-        }, 'auth-app');
-      } catch (credError) {
-        console.warn('[Server Auth] Could not load service account:', (credError as Error).message);
-        // Fallback to minimal config (works but less secure)
-        return admin.initializeApp({
-          projectId: 'api-now-bd858',
-        }, 'auth-app');
+      // Use environment variable for service account (production-safe)
+      if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        try {
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+          return admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            projectId: 'api-now-bd858',
+          }, 'auth-app');
+        } catch (error) {
+          console.warn('[Server Auth] Failed to parse service account from env:', (error as Error).message);
+        }
       }
+      
+      // Fallback: initialize with minimal config
+      // This works for token verification (tokens are self-verifying)
+      console.log('[Server Auth] Using minimal Firebase Admin config');
+      return admin.initializeApp({
+        projectId: 'api-now-bd858',
+      }, 'auth-app');
     }
     return admin.app('auth-app');
   }
