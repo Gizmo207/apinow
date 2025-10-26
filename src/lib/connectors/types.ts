@@ -11,6 +11,6 @@ export interface DatabaseAdapter {
 }
 
 export interface DatabaseConfig {
-  type: 'firestore' | 'postgres' | 'mysql' | 'mongo' | 'sqlite' | 'sqlserver' | 'supabase' | 'redis' | 'mariadb' | 'dynamodb';
+  type: 'firestore' | 'postgres' | 'mysql' | 'mongo' | 'sqlite' | 'sqlserver' | 'supabase' | 'redis' | 'mariadb' | 'dynamodb' | 'oracle';
   [key: string]: any;
 }
