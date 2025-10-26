@@ -31,6 +31,17 @@ export default function DashboardPage() {
   const [endpoints, setEndpoints] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Read view from URL query params (for Stripe redirects)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      if (viewParam && ['dashboard', 'databases', 'schema', 'builder', 'unified', 'tester', 'docs', 'analytics', 'settings'].includes(viewParam)) {
+        setCurrentView(viewParam as ViewType);
+      }
+    }
+  }, []);
+
   // Persist current view to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
