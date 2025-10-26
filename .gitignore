@@ -109,3 +109,4 @@ pnpm-debug.log*
 # Keep local env files
 .env*.local
 VERCEL_ENV_VARS.md
+.vercel
