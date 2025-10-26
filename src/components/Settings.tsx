@@ -40,6 +40,12 @@ export function Settings() {
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
 
+  // General settings state
+  const [orgName, setOrgName] = useState('');
+  const [rateLimit, setRateLimit] = useState('100');
+  const [authMode, setAuthMode] = useState('required');
+  const [savingGeneral, setSavingGeneral] = useState(false);
+
   // Load user data and notification preferences on mount
   React.useEffect(() => {
     const loadUserData = async () => {
@@ -64,6 +70,24 @@ export function Settings() {
         } catch (error) {
           console.error('Failed to load notification preferences:', error);
         }
+
+        // Load general settings
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch('/api/settings/general', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const settings = data.generalSettings;
+            setOrgName(settings.orgName || '');
+            setRateLimit(settings.rateLimit || '100');
+            setAuthMode(settings.authMode || 'required');
+          }
+        } catch (error) {
+          console.error('Failed to load general settings:', error);
+        }
       }
     };
 
@@ -72,7 +96,6 @@ export function Settings() {
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
-    { id: 'developer', label: 'Developer Tools', icon: Code },
     { id: 'api-keys', label: 'API Keys', icon: Key },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -314,6 +337,40 @@ export function Settings() {
     }
   };
 
+  const saveGeneralSettings = async () => {
+    setSavingGeneral(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/settings/general', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orgName,
+          rateLimit,
+          authMode,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save general settings');
+      }
+
+      alert('✅ General settings saved successfully!');
+      console.log('[General] Settings saved successfully');
+    } catch (error) {
+      console.error('[General] Failed to save settings:', error);
+      alert('❌ Failed to save general settings');
+    } finally {
+      setSavingGeneral(false);
+    }
+  };
+
   const toggleNotification = async (key: keyof typeof notificationPrefs) => {
     const newPrefs = {
       ...notificationPrefs,
@@ -383,121 +440,94 @@ export function Settings() {
         <div className="lg:col-span-3 bg-white rounded-lg border border-gray-200 p-6">
           {activeTab === 'general' && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">General Settings</h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Organization Name
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue="Acme Corp"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Default Rate Limit
-                    </label>
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      <option>100 requests/minute</option>
-                      <option>500 requests/minute</option>
-                      <option>1000 requests/minute</option>
-                      <option>Unlimited</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Default Authentication
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center">
-                        <input type="radio" name="auth" value="required" defaultChecked className="mr-2" />
-                        <span>Require API key for all endpoints</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input type="radio" name="auth" value="optional" className="mr-2" />
-                        <span>Make API key optional</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input type="radio" name="auth" value="none" className="mr-2" />
-                        <span>No authentication required</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">General Settings</h2>
+                {savingGeneral && (
+                  <span className="text-sm text-gray-500">Saving...</span>
+                )}
               </div>
-            </div>
-          )}
-
-          {activeTab === 'developer' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-gray-900">Developer Tools</h2>
-              
+                
               <div className="space-y-6">
-                <div className="border border-blue-200 rounded-lg p-6 bg-blue-50">
-                  <h3 className="font-medium text-gray-900 mb-2">🔑 Get My Firebase ID Token</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Click the button below to get your Firebase authentication token. This token will be automatically copied to your clipboard.
-                  </p>
-                  <p className="text-sm text-gray-600 mb-4">
-                    <strong>Use this token to run the analytics test script:</strong>
-                  </p>
-                  <code className="block bg-gray-900 text-green-400 p-3 rounded-md text-sm mb-4">
-                    node test-analytics.js YOUR_TOKEN_HERE
-                  </code>
-                  
-                  <button
-                    onClick={getMyToken}
-                    disabled={gettingToken}
-                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Organization Name
+                  </label>
+                  <input
+                    type="text"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="Enter your organization name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">This will be displayed in your API documentation</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Default Rate Limit
+                  </label>
+                  <select 
+                    value={rateLimit}
+                    onChange={(e) => setRateLimit(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    {tokenCopied ? (
-                      <>
-                        <Check className="w-5 h-5" />
-                        <span>Token Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-5 h-5" />
-                        <span>{gettingToken ? 'Getting Token...' : 'Get My Token'}</span>
-                      </>
-                    )}
-                  </button>
-
-                  {token && (
-                    <div className="mt-4 p-3 bg-white rounded-md border border-gray-200">
-                      <p className="text-xs text-gray-500 mb-1">Your Token (already copied to clipboard):</p>
-                      <code className="text-xs text-gray-700 break-all">{token}</code>
-                    </div>
-                  )}
+                    <option value="100">100 requests/minute</option>
+                    <option value="500">500 requests/minute</option>
+                    <option value="1000">1000 requests/minute</option>
+                    <option value="unlimited">Unlimited</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Applied to all new API endpoints by default</p>
                 </div>
 
-                <div className="border border-gray-200 rounded-lg p-6">
-                  <h3 className="font-medium text-gray-900 mb-2">📊 Analytics Test Script</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Run the test script to generate 100 API requests and see your analytics in action:
-                  </p>
-                  <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-                    <li>Click "Get My Token" button above</li>
-                    <li>Open a terminal in your project root</li>
-                    <li>Run: <code className="bg-gray-100 px-2 py-1 rounded">node test-analytics.js [paste-token-here]</code></li>
-                    <li>Watch the script make 100 requests</li>
-                    <li>Go to Analytics page to see the data!</li>
-                  </ol>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Default Authentication
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input 
+                        type="radio" 
+                        name="auth" 
+                        value="required" 
+                        checked={authMode === 'required'}
+                        onChange={(e) => setAuthMode(e.target.value)}
+                        className="mr-2" 
+                      />
+                      <span>Require API key for all endpoints</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input 
+                        type="radio" 
+                        name="auth" 
+                        value="optional" 
+                        checked={authMode === 'optional'}
+                        onChange={(e) => setAuthMode(e.target.value)}
+                        className="mr-2" 
+                      />
+                      <span>Make API key optional</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input 
+                        type="radio" 
+                        name="auth" 
+                        value="none" 
+                        checked={authMode === 'none'}
+                        onChange={(e) => setAuthMode(e.target.value)}
+                        className="mr-2" 
+                      />
+                      <span>No authentication required</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">You can override this for individual endpoints</p>
                 </div>
 
-                <div className="border border-yellow-200 rounded-lg p-6 bg-yellow-50">
-                  <h3 className="font-medium text-yellow-900 mb-2">⚠️ Security Note</h3>
-                  <p className="text-sm text-yellow-700">
-                    Your Firebase ID token is sensitive. Never share it publicly or commit it to version control. 
-                    Tokens expire after 1 hour and will be automatically refreshed by Firebase.
-                  </p>
-                </div>
+                <button
+                  onClick={saveGeneralSettings}
+                  disabled={savingGeneral}
+                  className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {savingGeneral ? 'Saving...' : '💾 Save General Settings'}
+                </button>
               </div>
             </div>
           )}

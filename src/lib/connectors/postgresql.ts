@@ -1,8 +1,9 @@
+import { Pool, PoolClient } from 'pg';
 import { DatabaseAdapter, DatabaseConnection, DatabaseTable, CrudResult } from './types';
 
 export class PostgreSQLAdapter implements DatabaseAdapter {
   private connection: DatabaseConnection;
-  private client: any = null; // Will be actual PostgreSQL client
+  private pool: Pool | null = null;
 
   constructor(connection: DatabaseConnection) {
     this.connection = connection;
@@ -10,22 +11,27 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
   async connect(): Promise<void> {
     try {
-      // In a real implementation, you'd use 'pg' library:
-      // const { Client } = require('pg');
-      // this.client = new Client({
-      //   host: this.connection.host,
-      //   port: this.connection.port,
-      //   database: this.connection.database,
-      //   user: this.connection.username,
-      //   password: this.connection.password,
-      //   ssl: this.connection.ssl ? { rejectUnauthorized: false } : false
-      // });
-      // await this.client.connect();
+      this.pool = new Pool({
+        host: this.connection.host,
+        port: parseInt(this.connection.port || '5432'),
+        database: this.connection.database,
+        user: this.connection.username,
+        password: this.connection.password,
+        ssl: this.connection.ssl ? { rejectUnauthorized: false } : undefined,
+        max: 10, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+      });
+
+      // Test the connection
+      const client = await this.pool.connect();
+      await client.query('SELECT NOW()');
+      client.release();
       
-      console.log(`Connected to PostgreSQL database: ${this.connection.name}`);
+      console.log(`✅ Connected to PostgreSQL database: ${this.connection.name}`);
     } catch (error) {
-      console.error('Failed to connect to PostgreSQL:', error);
-      throw error;
+      console.error('❌ Failed to connect to PostgreSQL:', error);
+      throw new Error(`PostgreSQL connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
