@@ -124,7 +124,93 @@ async function handleDynamicRequest(
       );
     }
 
-    // Connect to database - convert to expected format
+    // For Firestore, use Admin SDK directly instead of the client adapter
+    if (database.type === 'firebase') {
+      const { getOurFirestore } = await import('@/services/firebaseServiceServer');
+      const db = getOurFirestore();
+      
+      // Execute the appropriate database operation using Admin SDK
+      let result;
+      const body = method !== 'GET' ? await request.json().catch(() => ({})) : {};
+      const searchParams = request.nextUrl.searchParams;
+
+      try {
+        switch (method) {
+          case 'GET':
+            const limit = parseInt(searchParams.get('limit') || '100');
+            const snapshot = await db.collection(matchedEndpoint.tableName).limit(limit).get();
+            result = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            break;
+
+          case 'POST':
+            if (body.id) {
+              await db.collection(matchedEndpoint.tableName).doc(body.id).set(body);
+              result = { id: body.id, ...body };
+            } else {
+              const docRef = await db.collection(matchedEndpoint.tableName).add(body);
+              result = { id: docRef.id, ...body };
+            }
+            break;
+
+          case 'PUT':
+          case 'PATCH':
+            if (!body.id) {
+              return NextResponse.json({ error: 'Missing id in request body' }, { status: 400 });
+            }
+            await db.collection(matchedEndpoint.tableName).doc(body.id).update(body);
+            result = body;
+            break;
+
+          case 'DELETE':
+            const deleteId = searchParams.get('id') || body.id;
+            if (!deleteId) {
+              return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
+            }
+            await db.collection(matchedEndpoint.tableName).doc(deleteId).delete();
+            result = { success: true, id: deleteId };
+            break;
+
+          default:
+            return NextResponse.json({ error: 'Method not supported' }, { status: 405 });
+        }
+
+        statusCode = 200;
+        const responseTime = Date.now() - startTime;
+        
+        logApiRequest({
+          endpoint: requestedPath,
+          method,
+          statusCode,
+          responseTime,
+          userId,
+          success: true,
+          userAgent: request.headers.get('user-agent') || undefined,
+        }).catch(console.error);
+
+        return NextResponse.json(result);
+      } catch (error) {
+        console.error('Firebase Admin operation failed:', error);
+        statusCode = 500;
+        const responseTime = Date.now() - startTime;
+        
+        logApiRequest({
+          endpoint: requestedPath,
+          method,
+          statusCode,
+          responseTime,
+          userId,
+          success: false,
+          userAgent: request.headers.get('user-agent') || undefined,
+        }).catch(console.error);
+
+        return NextResponse.json(
+          { error: 'Database operation failed', details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
+    }
+    
+    // For other database types, use the unified service adapter
     const dbConfig: any = {
       ...database,
       database: database.databaseName,
