@@ -60,7 +60,14 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
       adminApiKey: database.adminApiKey || '',
       adminAuthDomain: database.adminAuthDomain || '',
       databaseURL: database.databaseURL || '',
-      storageBucket: database.storageBucket || ''
+      storageBucket: database.storageBucket || '',
+      connectionString: database.connectionString || '',
+      supabaseUrl: database.supabaseUrl || '',
+      supabaseKey: database.supabaseKey || '',
+      awsRegion: database.awsRegion || '',
+      awsAccessKey: database.awsAccessKey || '',
+      awsSecretKey: database.awsSecretKey || '',
+      redisPassword: database.redisPassword || ''
     });
     setShowAddForm(true);
   };
@@ -70,7 +77,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
     setShowAddForm(false);
     setFormData({
       name: '',
-      type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
+      type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase' | 'mongodb' | 'sqlserver' | 'mariadb' | 'supabase' | 'oracle' | 'redis' | 'dynamodb' | 'cassandra',
       host: '',
       port: '',
       database: '',
@@ -83,7 +90,14 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
       adminApiKey: '',
       adminAuthDomain: '',
       databaseURL: '',
-      storageBucket: ''
+      storageBucket: '',
+      connectionString: '',
+      supabaseUrl: '',
+      supabaseKey: '',
+      awsRegion: '',
+      awsAccessKey: '',
+      awsSecretKey: '',
+      redisPassword: ''
     });
   };
 
