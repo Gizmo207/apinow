@@ -98,6 +98,12 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
 
       const { FirebaseService } = await import("../services/firebaseService");
       
+      console.log('[UnifiedAPIBuilder] Saving endpoint:', {
+        collection: endpoint.collection,
+        endpointPath: endpoint.path,
+        finalPath: `/api/dynamic${endpoint.path}`
+      });
+      
       const savedEndpoint = await FirebaseService.getInstance().saveEndpoint({
         name: endpoint.description || `${endpoint.method} ${endpoint.collection}`,
         path: `/api/dynamic${endpoint.path}`,

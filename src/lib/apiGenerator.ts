@@ -22,7 +22,10 @@ export class DatabaseAPIGenerator {
     const collections = await this.adapter.listCollections();
     const endpoints: APIEndpoint[] = [];
 
+    console.log('[APIGenerator] Collections from adapter:', collections);
+
     for (const collection of collections) {
+      console.log('[APIGenerator] Generating endpoints for collection:', collection);
       // List all documents in collection
       endpoints.push({
         id: `${collection}-list`,
