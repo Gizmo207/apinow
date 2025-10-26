@@ -13,7 +13,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
   const [editingDatabase, setEditingDatabase] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase',
+    type: 'sqlite' as 'sqlite' | 'mysql' | 'postgresql' | 'firebase' | 'mongodb' | 'sqlserver' | 'mariadb' | 'supabase' | 'oracle' | 'redis' | 'dynamodb' | 'cassandra',
     host: '',
     port: '',
     database: '',
@@ -27,7 +27,18 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
     adminApiKey: '',
     adminAuthDomain: '',
     databaseURL: '',
-    storageBucket: ''
+    storageBucket: '',
+    // MongoDB
+    connectionString: '',
+    // Supabase
+    supabaseUrl: '',
+    supabaseKey: '',
+    // AWS DynamoDB
+    awsRegion: '',
+    awsAccessKey: '',
+    awsSecretKey: '',
+    // Redis
+    redisPassword: ''
   });
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
   const [connectionResults, setConnectionResults] = useState<{ [key: string]: 'success' | 'error' | null }>({});
@@ -233,10 +244,26 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   aria-label="Database Type"
                 >
-                  <option value="sqlite">SQLite</option>
-                  <option value="mysql">MySQL</option>
-                  <option value="postgresql">PostgreSQL</option>
-                  <option value="firebase">Firebase Firestore</option>
+                  <optgroup label="📁 Embedded">
+                    <option value="sqlite">SQLite</option>
+                  </optgroup>
+                  <optgroup label="🗄️ SQL Databases">
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="sqlserver">Microsoft SQL Server</option>
+                    <option value="mariadb">MariaDB</option>
+                    <option value="oracle">Oracle Database</option>
+                  </optgroup>
+                  <optgroup label="📦 NoSQL Databases">
+                    <option value="mongodb">MongoDB</option>
+                    <option value="dynamodb">Amazon DynamoDB</option>
+                    <option value="cassandra">Apache Cassandra</option>
+                    <option value="redis">Redis</option>
+                  </optgroup>
+                  <optgroup label="☁️ Cloud Platforms">
+                    <option value="firebase">Firebase Firestore</option>
+                    <option value="supabase">Supabase (PostgreSQL)</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
