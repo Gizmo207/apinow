@@ -4,7 +4,7 @@ import { getOurFirestore } from '@/services/firebaseServiceServer';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { endpointId: string } }
+  { params }: { params: Promise<{ endpointId: string }> }
 ) {
   try {
     console.log('[Toggle Public] Starting request');
