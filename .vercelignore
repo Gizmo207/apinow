@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Local env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+.nyc_output
+
+# Documentation
+*.md
+!README.md
+DEPLOY_MODE.md
+PRODUCTION_POLISH_COMPLETE.md
+STRIPE_BILLING_SETUP.md
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+.cache
