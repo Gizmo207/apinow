@@ -9,7 +9,7 @@ import {
   Save,
   Check,
 } from "lucide-react";
-import { UnifiedDatabaseService } from "../utils/unifiedDatabase";
+import { connectToDatabaseAction, generateEndpointsAction, testEndpointAction } from "../actions/databaseActions";
 import { DatabaseConnection } from "../utils/database";
 import { APIEndpoint } from "../lib/apiGenerator";
 
@@ -28,8 +28,6 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   const [viewModes, setViewModes] = useState<Map<string, "pretty" | "raw">>(new Map());
   const [activeSaves, setActiveSaves] = useState<Set<string>>(new Set());
   const [hasGeneratedEndpoints, setHasGeneratedEndpoints] = useState(false);
-
-  const unifiedService = UnifiedDatabaseService.getInstance();
 
   useEffect(() => {
     if (databases.length && !selectedDatabase) setSelectedDatabase(databases[0]);
@@ -58,17 +56,22 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
   const generateEndpoints = async (db: DatabaseConnection) => {
     setLoading(true);
     try {
-      await unifiedService.connectToDatabase(db);
-      const generated = await unifiedService.generateAPIEndpoints(db.id, db);
+      await connectToDatabaseAction(db);
+      const result = await generateEndpointsAction(db.id, db);
       
-      const unsaved = generated.filter(ep => 
-        !savedEndpoints.some(saved => 
-          saved.path === `/api/dynamic${ep.path}` && 
-          saved.method === ep.method
-        )
-      );
-      
-      setEndpoints(unsaved);
+      if (result.success && result.endpoints) {
+        const unsaved = result.endpoints.filter(ep => 
+          !savedEndpoints.some(saved => 
+            saved.path === `/api/dynamic${ep.path}` && 
+            saved.method === ep.method
+          )
+        );
+        
+        setEndpoints(unsaved);
+      } else {
+        console.error("Endpoint generation failed:", result.error);
+        setEndpoints([]);
+      }
       setHasGeneratedEndpoints(true);
     } catch (error) {
       console.error("Endpoint generation failed:", error);
@@ -146,18 +149,22 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
         });
       }
 
-      const result = await unifiedService.executeAPIEndpoint(
+      const result = await testEndpointAction(
         selectedDatabase.id,
         endpoint.id,
         params,
         body
       );
 
-      setTestResults(prev => new Map(prev.set(endpoint.id, {
-        success: true,
-        data: result,
-        timestamp: new Date().toISOString()
-      })));
+      if (result.success) {
+        setTestResults(prev => new Map(prev.set(endpoint.id, {
+          success: true,
+          data: result.result,
+          timestamp: new Date().toISOString()
+        })));
+      } else {
+        throw new Error(result.error || 'Test failed');
+      }
     } catch (error: any) {
       setTestResults(prev => new Map(prev.set(endpoint.id, {
         success: false,

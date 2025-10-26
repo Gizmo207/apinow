@@ -30,19 +30,22 @@ export function APIBuilder({ databases = [], onEndpointsChange }: APIBuilderProp
     const loadTables = async () => {
       if (!selectedDatabase) return;
       
-      // Use the SAME method as SchemaExplorer to get tables
+      // Use server actions to get tables
       try {
-        const { UnifiedDatabaseService } = await import('../utils/unifiedDatabase');
-        const unifiedService = UnifiedDatabaseService.getInstance();
+        const { introspectDatabaseAction, connectToDatabaseAction } = await import('../actions/databaseActions');
         
-        // Connect to database using unified service
-        await unifiedService.connectToDatabase(selectedDatabase);
+        // Connect to database using server action
+        await connectToDatabaseAction(selectedDatabase);
         
-        // Introspect database schema - same as SchemaExplorer
-        const schema = await unifiedService.introspectDatabase(selectedDatabase.id);
-        setTables(schema);
-        
-        console.log('API Builder loaded tables:', schema.map(t => t.name));
+        // Introspect database schema via server action
+        const result = await introspectDatabaseAction(selectedDatabase);
+        if (result.success && result.tables) {
+          setTables(result.tables);
+          console.log('API Builder loaded tables:', result.tables.map(t => t.name));
+        } else {
+          console.error('Failed to load tables:', result.error);
+          setTables([]);
+        }
       } catch (error) {
         console.error('Failed to load tables:', error);
         setTables([]);

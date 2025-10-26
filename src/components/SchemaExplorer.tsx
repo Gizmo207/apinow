@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Database, Table, Eye, Search, RefreshCw } from 'lucide-react';
-import { UnifiedDatabaseService } from '../utils/unifiedDatabase';
+import { introspectDatabaseAction, getTableDataAction, connectToDatabaseAction } from '../actions/databaseActions';
 
 interface SchemaExplorerProps {
   databases: any[];
@@ -119,14 +119,17 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     
     setLoading(true);
     try {
-      const unifiedService = UnifiedDatabaseService.getInstance();
+      // Connect to database using server action
+      await connectToDatabaseAction(selectedDatabase);
       
-      // Connect to database using unified service (this will handle admin credentials for Firebase)
-      await unifiedService.connectToDatabase(selectedDatabase);
-      
-      // Introspect database schema (pass connection for Firebase server-side access)
-      const schema = await unifiedService.introspectDatabase(selectedDatabase.id, selectedDatabase);
-      setTables(schema);
+      // Introspect database schema via server action
+      const result = await introspectDatabaseAction(selectedDatabase);
+      if (result.success && result.tables) {
+        setTables(result.tables);
+      } else {
+        console.error('Failed to load schema:', result.error);
+        setTables([]);
+      }
     } catch (error) {
       console.error('Failed to load schema:', error);
       setTables([]);
@@ -140,18 +143,15 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     
     setLoading(true);
     try {
-      const unifiedService = UnifiedDatabaseService.getInstance();
-      
-      // Get adapter for this database
-      const adapter = unifiedService.getAdapter(selectedDatabase.id);
-      if (!adapter) {
-        throw new Error('Database adapter not found');
+      // Get table data via server action
+      const result = await getTableDataAction(selectedDatabase.id, table.name, 10, 0);
+      if (result.success && result.data) {
+        setTableData(result.data);
+        setSelectedTable(table);
+      } else {
+        console.error('Failed to load table data:', result.error);
+        setTableData([]);
       }
-      
-      // Query table data directly through adapter
-      const data = await adapter.listDocuments(table.name, 10);
-      setTableData(data);
-      setSelectedTable(table);
     } catch (error) {
       console.error('Failed to load table data:', error);
       setTableData([]);
