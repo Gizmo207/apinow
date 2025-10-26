@@ -9,6 +9,7 @@ import { SQLServerAdapter } from './sqlserver';
 import { SupabaseAdapter } from './supabase';
 import { RedisAdapter } from './redis';
 import { MariaDBAdapter } from './mariadb';
+import { DynamoDBAdapter } from './dynamodb';
 
 export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseAdapter> {
   switch (config.type) {
@@ -53,6 +54,11 @@ export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseA
       await mariadbAdapter.connect();
       return mariadbAdapter;
     
+    case 'dynamodb':
+      const dynamodbAdapter = new DynamoDBAdapter(config);
+      await dynamodbAdapter.connect();
+      return dynamodbAdapter;
+    
     default:
       throw new Error(`Unsupported database type: ${config.type}`);
   }
@@ -68,3 +74,4 @@ export { SQLServerAdapter } from './sqlserver';
 export { SupabaseAdapter } from './supabase';
 export { RedisAdapter } from './redis';
 export { MariaDBAdapter } from './mariadb';
+export { DynamoDBAdapter } from './dynamodb';
