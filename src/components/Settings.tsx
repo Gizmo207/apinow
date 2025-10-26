@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Key, Shield, Bell, User, Code, Copy, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Key, Shield, Bell, User, Code, Copy, Check, CreditCard } from 'lucide-react';
 import { auth } from '@/services/firebaseService';
+import { BillingTab } from './BillingTab';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
@@ -96,10 +97,12 @@ export function Settings() {
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
+    { id: 'billing', label: 'Billing', icon: CreditCard },
     { id: 'api-keys', label: 'API Keys', icon: Key },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'account', label: 'Account', icon: User },
+    { id: 'developer', label: 'Developer', icon: Code },
   ];
 
   const getMyToken = async () => {
@@ -438,6 +441,10 @@ export function Settings() {
 
         {/* Settings Content */}
         <div className="lg:col-span-3 bg-white rounded-lg border border-gray-200 p-6">
+          {activeTab === 'billing' && (
+            <BillingTab user={auth.currentUser} />
+          )}
+
           {activeTab === 'general' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">

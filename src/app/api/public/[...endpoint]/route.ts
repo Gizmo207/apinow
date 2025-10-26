@@ -4,6 +4,7 @@ import { verifyApiKey } from '@/lib/verifyApiKey';
 import { UnifiedDatabaseService } from '@/utils/unifiedDatabase';
 import { logRequest } from '@/lib/logRequest';
 import { getCached, setCached, generateCacheKey, invalidateCache } from '@/lib/cache';
+import { trackUsage } from '@/lib/usageTracker';
 
 export async function GET(
   req: Request,
@@ -46,6 +47,25 @@ export async function GET(
       responseTime: Date.now() - startTime,
     });
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 1.5️⃣ Track usage and enforce plan limits
+  try {
+    const userId = keyCheck.keyData?.userId;
+    if (userId) {
+      await trackUsage(userId);
+    }
+  } catch (error: any) {
+    await logRequest({
+      endpoint: endpointPath,
+      status: 429,
+      error: error.message,
+      source: 'public',
+      apiKey: apiKey || '',
+      method: 'GET',
+      responseTime: Date.now() - startTime,
+    });
+    return NextResponse.json({ success: false, error: error.message }, { status: 429 });
   }
 
   // 2️⃣ Find endpoint in Firestore
