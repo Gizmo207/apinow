@@ -26,7 +26,6 @@ export class UnifiedDatabaseService {
             projectId: connection.projectId!,
             apiKey: connection.apiKey!,
             authDomain: connection.authDomain,
-            // Include Firebase Admin SDK credentials
             serviceAccountKey: connection.serviceAccountKey,
             databaseURL: connection.databaseURL,
             storageBucket: connection.storageBucket
@@ -59,6 +58,86 @@ export class UnifiedDatabaseService {
             database: connection.database,
             user: connection.username,
             password: connection.password
+          };
+          break;
+
+        case 'supabase':
+          config = {
+            type: 'supabase',
+            supabaseUrl: connection.supabaseUrl!,
+            supabaseKey: connection.supabaseKey!
+          };
+          break;
+
+        case 'mongodb':
+          config = {
+            type: 'mongo',
+            connectionString: connection.connectionString,
+            host: connection.host,
+            port: parseInt(connection.port || '27017'),
+            database: connection.database,
+            user: connection.username,
+            password: connection.password
+          };
+          break;
+
+        case 'redis':
+          config = {
+            type: 'redis',
+            host: connection.host,
+            port: parseInt(connection.port || '6379'),
+            password: connection.password
+          };
+          break;
+
+        case 'sqlserver':
+          config = {
+            type: 'sqlserver',
+            host: connection.host,
+            port: parseInt(connection.port || '1433'),
+            database: connection.database,
+            user: connection.username,
+            password: connection.password
+          };
+          break;
+
+        case 'mariadb':
+          config = {
+            type: 'mariadb',
+            host: connection.host,
+            port: parseInt(connection.port || '3306'),
+            database: connection.database,
+            user: connection.username,
+            password: connection.password
+          };
+          break;
+
+        case 'dynamodb':
+          config = {
+            type: 'dynamodb',
+            region: connection.region!,
+            accessKeyId: connection.accessKeyId,
+            secretAccessKey: connection.secretAccessKey
+          };
+          break;
+
+        case 'oracle':
+          config = {
+            type: 'oracle',
+            host: connection.host,
+            port: parseInt(connection.port || '1521'),
+            database: connection.database,
+            user: connection.username,
+            password: connection.password
+          };
+          break;
+
+        case 'cassandra':
+          config = {
+            type: 'cassandra',
+            contactPoints: connection.host ? [connection.host] : ['127.0.0.1'],
+            localDataCenter: connection.database || 'datacenter1',
+            keyspace: connection.database
           };
           break;
 

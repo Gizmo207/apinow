@@ -5,7 +5,7 @@ import { getFirestore, collection, getDocs, query, limit } from 'firebase/firest
 export interface DatabaseConnection {
   id: string;
   name: string;
-  type: 'postgresql' | 'mysql' | 'sqlite' | 'csv' | 'firebase';
+  type: 'postgresql' | 'mysql' | 'sqlite' | 'csv' | 'firebase' | 'supabase' | 'mongodb' | 'redis' | 'sqlserver' | 'mariadb' | 'dynamodb' | 'oracle' | 'cassandra';
   host?: string;
   port?: string;
   database?: string;
@@ -21,6 +21,15 @@ export interface DatabaseConnection {
   adminAuthDomain?: string;
   databaseURL?: string;
   storageBucket?: string;
+  // Supabase specific fields
+  supabaseUrl?: string;
+  supabaseKey?: string;
+  // AWS specific fields
+  region?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  // Connection string (for MongoDB, Redis, etc.)
+  connectionString?: string;
   status: 'connected' | 'disconnected' | 'error';
   tables: DatabaseTable[];
   createdAt: string;
