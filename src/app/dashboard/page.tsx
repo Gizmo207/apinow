@@ -42,6 +42,23 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Listen for hash changes to support navigation from other components
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.substring(1).split('?')[0];
+      if (hash && ['dashboard', 'databases', 'schema', 'builder', 'unified', 'tester', 'docs', 'analytics', 'settings'].includes(hash)) {
+        setCurrentView(hash as ViewType);
+      }
+    };
+
+    // Load on mount
+    handleHashChange();
+    
+    // Listen for changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   // Persist current view to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {

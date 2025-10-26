@@ -14,6 +14,53 @@ export function APITester() {
   const [copied, setCopied] = useState(false);
   const [useAuth, setUseAuth] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<string>('');
+
+  // Load saved endpoints
+  useEffect(() => {
+    loadSavedEndpoints();
+  }, []);
+
+  // Parse URL params on mount and listen for hash changes
+  useEffect(() => {
+    const loadFromHash = () => {
+      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      const urlParam = params.get('url');
+      const methodParam = params.get('method');
+      
+      if (urlParam) {
+        setUrl(urlParam);
+      }
+      if (methodParam) {
+        setMethod(methodParam);
+      }
+    };
+
+    loadFromHash();
+    window.addEventListener('hashchange', loadFromHash);
+    return () => window.removeEventListener('hashchange', loadFromHash);
+  }, []);
+
+  const loadSavedEndpoints = async () => {
+    try {
+      const { FirebaseService } = await import('../services/firebaseService');
+      const firebaseService = FirebaseService.getInstance();
+      const endpoints = await firebaseService.getEndpoints();
+      setSavedEndpoints(endpoints);
+    } catch (error) {
+      console.error('Failed to load endpoints:', error);
+    }
+  };
+
+  const handleEndpointSelect = (endpointId: string) => {
+    setSelectedEndpoint(endpointId);
+    const endpoint = savedEndpoints.find(ep => ep.id === endpointId);
+    if (endpoint) {
+      setUrl(`http://localhost:3000${endpoint.path}`);
+      setMethod(endpoint.method);
+    }
+  };
 
   const handleSendRequest = async () => {
     if (!url) return;
@@ -194,6 +241,27 @@ export function APITester() {
         {/* Request Panel */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold mb-4">Request</h2>
+          
+          {/* Endpoint Selector */}
+          {savedEndpoints.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Saved Endpoint (Optional)
+              </label>
+              <select
+                value={selectedEndpoint}
+                onChange={(e) => handleEndpointSelect(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Select an endpoint --</option>
+                {savedEndpoints.map((ep) => (
+                  <option key={ep.id} value={ep.id}>
+                    {ep.method} - {ep.name} ({ep.path})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           
           {/* URL and Method */}
           <div className="flex gap-2 mb-4">
