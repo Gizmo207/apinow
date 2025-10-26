@@ -195,7 +195,7 @@ export class UnifiedDatabaseService {
               id: `${collection}-list`,
               collection,
               method: 'GET',
-              path: `/api/${collection}`,
+              path: `/${collection}`,
               description: `List all documents in ${collection}`,
               enabled: true
             },
@@ -203,7 +203,7 @@ export class UnifiedDatabaseService {
               id: `${collection}-create`,
               collection,
               method: 'POST',
-              path: `/api/${collection}`,
+              path: `/${collection}`,
               description: `Create a new document in ${collection}`,
               enabled: true
             },
@@ -211,7 +211,7 @@ export class UnifiedDatabaseService {
               id: `${collection}-read`,
               collection,
               method: 'GET',
-              path: `/api/${collection}/:id`,
+              path: `/${collection}/:id`,
               description: `Get a single document from ${collection}`,
               enabled: true
             },
@@ -219,7 +219,7 @@ export class UnifiedDatabaseService {
               id: `${collection}-update`,
               collection,
               method: 'PUT',
-              path: `/api/${collection}/:id`,
+              path: `/${collection}/:id`,
               description: `Update a document in ${collection}`,
               enabled: true
             },
@@ -227,7 +227,7 @@ export class UnifiedDatabaseService {
               id: `${collection}-delete`,
               collection,
               method: 'DELETE',
-              path: `/api/${collection}/:id`,
+              path: `/${collection}/:id`,
               description: `Delete a document from ${collection}`,
               enabled: true
             }
