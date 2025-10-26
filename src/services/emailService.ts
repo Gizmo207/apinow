@@ -1,8 +1,9 @@
-// Production Email Service using Resend
-import { Resend } from 'resend';
+// Production Email Service using Brevo (formerly Sendinblue)
+import * as brevo from '@getbrevo/brevo';
 
-// Initialize Resend (API key from environment variable)
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Brevo API
+const apiInstance = new brevo.TransactionalEmailsApi();
+apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY || '');
 
 export interface WeeklyReportData {
   userName: string;
@@ -21,15 +22,15 @@ export async function sendWeeklyReport(data: WeeklyReportData) {
   try {
     const emailHtml = generateWeeklyReportHTML(data);
     
-    const result = await resend.emails.send({
-      from: 'APIFlow <notifications@apinow.dev>',
-      to: data.userEmail,
-      subject: `📊 Your Weekly API Report - ${data.period}`,
-      html: emailHtml,
-    });
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    sendSmtpEmail.sender = { name: 'APIFlow', email: 'notifications@apinow.cloud' };
+    sendSmtpEmail.to = [{ email: data.userEmail, name: data.userName }];
+    sendSmtpEmail.subject = `📊 Your Weekly API Report - ${data.period}`;
+    sendSmtpEmail.htmlContent = emailHtml;
 
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
     console.log('[Email] Weekly report sent to:', data.userEmail);
-    return { success: true, messageId: result.data?.id };
+    return { success: true, messageId: result.body.messageId };
   } catch (error) {
     console.error('[Email] Failed to send weekly report:', error);
     return { success: false, error };
@@ -41,22 +42,22 @@ export async function sendWeeklyReport(data: WeeklyReportData) {
  */
 export async function sendApiUsageAlert(userEmail: string, userName: string, percentage: number) {
   try {
-    const result = await resend.emails.send({
-      from: 'APIFlow <alerts@apinow.dev>',
-      to: userEmail,
-      subject: `⚠️ API Usage Alert - ${percentage}% of Rate Limit`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #f59e0b;">⚠️ API Usage Alert</h2>
-          <p>Hi ${userName},</p>
-          <p>Your API usage has reached <strong>${percentage}%</strong> of your rate limit.</p>
-          <p>Consider upgrading your plan or optimizing your API calls to avoid service interruption.</p>
-          <a href="https://yourdomain.com/dashboard" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">View Dashboard</a>
-        </div>
-      `,
-    });
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    sendSmtpEmail.sender = { name: 'APIFlow Alerts', email: 'alerts@apinow.cloud' };
+    sendSmtpEmail.to = [{ email: userEmail, name: userName }];
+    sendSmtpEmail.subject = `⚠️ API Usage Alert - ${percentage}% of Rate Limit`;
+    sendSmtpEmail.htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">⚠️ API Usage Alert</h2>
+        <p>Hi ${userName},</p>
+        <p>Your API usage has reached <strong>${percentage}%</strong> of your rate limit.</p>
+        <p>Consider upgrading your plan or optimizing your API calls to avoid service interruption.</p>
+        <a href="https://yourdomain.com/dashboard" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">View Dashboard</a>
+      </div>
+    `;
 
-    return { success: true, messageId: result.data?.id };
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    return { success: true, messageId: result.body.messageId };
   } catch (error) {
     console.error('[Email] Failed to send usage alert:', error);
     return { success: false, error };
@@ -68,23 +69,23 @@ export async function sendApiUsageAlert(userEmail: string, userName: string, per
  */
 export async function sendDowntimeAlert(userEmail: string, userName: string, endpoint: string) {
   try {
-    const result = await resend.emails.send({
-      from: 'APIFlow <alerts@apinow.dev>',
-      to: userEmail,
-      subject: `🔴 API Downtime Alert - ${endpoint}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #ef4444;">🔴 API Downtime Detected</h2>
-          <p>Hi ${userName},</p>
-          <p>Your API endpoint is currently experiencing issues:</p>
-          <p><strong>${endpoint}</strong></p>
-          <p>We'll notify you when service is restored.</p>
-          <a href="https://yourdomain.com/analytics" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">View Analytics</a>
-        </div>
-      `,
-    });
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    sendSmtpEmail.sender = { name: 'APIFlow Alerts', email: 'alerts@apinow.cloud' };
+    sendSmtpEmail.to = [{ email: userEmail, name: userName }];
+    sendSmtpEmail.subject = `🔴 API Downtime Alert - ${endpoint}`;
+    sendSmtpEmail.htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #ef4444;">🔴 API Downtime Detected</h2>
+        <p>Hi ${userName},</p>
+        <p>Your API endpoint is currently experiencing issues:</p>
+        <p><strong>${endpoint}</strong></p>
+        <p>We'll notify you when service is restored.</p>
+        <a href="https://yourdomain.com/analytics" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">View Analytics</a>
+      </div>
+    `;
 
-    return { success: true, messageId: result.data?.id };
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    return { success: true, messageId: result.body.messageId };
   } catch (error) {
     console.error('[Email] Failed to send downtime alert:', error);
     return { success: false, error };
@@ -96,23 +97,23 @@ export async function sendDowntimeAlert(userEmail: string, userName: string, end
  */
 export async function sendSecurityAlert(userEmail: string, userName: string, details: string) {
   try {
-    const result = await resend.emails.send({
-      from: 'APIFlow <security@apinow.dev>',
-      to: userEmail,
-      subject: `🔒 Security Alert - Suspicious Activity Detected`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #dc2626;">🔒 Security Alert</h2>
-          <p>Hi ${userName},</p>
-          <p>We detected suspicious activity on your account:</p>
-          <p><strong>${details}</strong></p>
-          <p>If this wasn't you, please secure your account immediately.</p>
-          <a href="https://yourdomain.com/settings" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Review Security Settings</a>
-        </div>
-      `,
-    });
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    sendSmtpEmail.sender = { name: 'APIFlow Security', email: 'security@apinow.cloud' };
+    sendSmtpEmail.to = [{ email: userEmail, name: userName }];
+    sendSmtpEmail.subject = `🔒 Security Alert - Suspicious Activity Detected`;
+    sendSmtpEmail.htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">🔒 Security Alert</h2>
+        <p>Hi ${userName},</p>
+        <p>We detected suspicious activity on your account:</p>
+        <p><strong>${details}</strong></p>
+        <p>If this wasn't you, please secure your account immediately.</p>
+        <a href="https://yourdomain.com/settings" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Review Security Settings</a>
+      </div>
+    `;
 
-    return { success: true, messageId: result.data?.id };
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    return { success: true, messageId: result.body.messageId };
   } catch (error) {
     console.error('[Email] Failed to send security alert:', error);
     return { success: false, error };
