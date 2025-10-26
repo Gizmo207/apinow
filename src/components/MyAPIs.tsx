@@ -196,11 +196,67 @@ export function MyAPIs() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">📌 My APIs</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your saved API endpoints. Create new ones in the API Explorer.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">📌 My APIs</h1>
+          <p className="text-gray-600 mt-1">
+            Manage your saved API endpoints. Create new ones in the API Explorer.
+          </p>
+        </div>
+        {savedEndpoints.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  const { auth } = await import('../services/firebaseService');
+                  const user = auth.currentUser;
+                  if (!user) return;
+                  const token = await user.getIdToken();
+                  const response = await fetch('/api/docs?format=json', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                  });
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'openapi.json';
+                  a.click();
+                  showToast('OpenAPI JSON downloaded!', 'success');
+                } catch (error) {
+                  showToast('Failed to generate docs', 'error');
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              📘 Download OpenAPI JSON
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const { auth } = await import('../services/firebaseService');
+                  const user = auth.currentUser;
+                  if (!user) return;
+                  const token = await user.getIdToken();
+                  const response = await fetch('/api/docs?format=yaml', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                  });
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'openapi.yaml';
+                  a.click();
+                  showToast('OpenAPI YAML downloaded!', 'success');
+                } catch (error) {
+                  showToast('Failed to generate docs', 'error');
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              📄 Download OpenAPI YAML
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Quick Stats */}

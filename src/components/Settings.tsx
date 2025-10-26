@@ -601,6 +601,38 @@ export function Settings() {
                         <span className="mx-2">•</span>
                         <span>Last used: {apiKey.lastUsed ? new Date(apiKey.lastUsed).toLocaleString() : 'Never'}</span>
                       </div>
+                      
+                      {/* Usage Stats */}
+                      {apiKey.usageCount !== undefined && (
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-gray-600">Usage:</span>
+                            <span className="font-medium text-gray-900">
+                              {apiKey.usageCount?.toLocaleString() || 0}
+                              {apiKey.usageLimit && apiKey.usageLimit > 0 && (
+                                <span className="text-gray-500"> / {apiKey.usageLimit.toLocaleString()}</span>
+                              )}
+                            </span>
+                          </div>
+                          {apiKey.usageLimit && apiKey.usageLimit > 0 && (
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  (apiKey.usageCount / apiKey.usageLimit) >= 0.9
+                                    ? 'bg-red-600'
+                                    : (apiKey.usageCount / apiKey.usageLimit) >= 0.7
+                                    ? 'bg-yellow-600'
+                                    : 'bg-green-600'
+                                }`}
+                                style={{
+                                  width: `${Math.min((apiKey.usageCount / apiKey.usageLimit) * 100, 100)}%`
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
                       <div className="mt-2">
                         <span className={`inline-block px-2 py-1 text-xs rounded ${
                           apiKey.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
