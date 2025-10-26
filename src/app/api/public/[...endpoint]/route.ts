@@ -8,7 +8,7 @@ import { trackUsage } from '@/lib/usageTracker';
 
 export async function GET(
   req: Request,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
   const startTime = Date.now();
   const url = new URL(req.url);
@@ -16,8 +16,11 @@ export async function GET(
   const db = getFirestore();
   const unifiedService = UnifiedDatabaseService.getInstance();
 
+  // Await params (Next.js 15+)
+  const { endpoint } = await params;
+  
   // Generate cache key
-  const endpointPath = '/' + params.endpoint.join('/');
+  const endpointPath = '/' + endpoint.join('/');
   const cacheKey = generateCacheKey(endpointPath, url.searchParams);
   
   // Try cache first (before auth to speed up public cached responses)
@@ -38,7 +41,7 @@ export async function GET(
   const keyCheck = await verifyApiKey(apiKey);
   if (!keyCheck.valid) {
     await logRequest({
-      endpoint: params.endpoint.join('/'),
+      endpoint: endpoint.join('/'),
       status: 401,
       error: keyCheck.reason,
       source: 'public',
@@ -119,19 +122,22 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
   const startTime = Date.now();
   const url = new URL(req.url);
   const apiKey = url.searchParams.get('key') || req.headers.get('authorization')?.replace('Bearer ', '');
   const db = getFirestore();
   const unifiedService = UnifiedDatabaseService.getInstance();
+  
+  // Await params (Next.js 15+)
+  const { endpoint } = await params;
 
   // 1️⃣ Verify API key
   const keyCheck = await verifyApiKey(apiKey);
   if (!keyCheck.valid) {
     await logRequest({
-      endpoint: params.endpoint.join('/'),
+      endpoint: endpoint.join('/'),
       status: 401,
       error: keyCheck.reason,
       source: 'public',
@@ -143,7 +149,7 @@ export async function POST(
   }
 
   // 2️⃣ Find endpoint in Firestore
-  const endpointPath = '/' + params.endpoint.join('/');
+  const endpointPath = '/' + endpoint.join('/');
   try {
     const body = await req.json();
     const snap = await db.collection('api_endpoints').where('path', '==', endpointPath).where('isPublic', '==', true).limit(1).get();
@@ -195,19 +201,22 @@ export async function POST(
 
 export async function PUT(
   req: Request,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
   const startTime = Date.now();
   const url = new URL(req.url);
   const apiKey = url.searchParams.get('key') || req.headers.get('authorization')?.replace('Bearer ', '');
   const db = getFirestore();
   const unifiedService = UnifiedDatabaseService.getInstance();
+  
+  // Await params (Next.js 15+)
+  const { endpoint } = await params;
 
   // 1️⃣ Verify API key
   const keyCheck = await verifyApiKey(apiKey);
   if (!keyCheck.valid) {
     await logRequest({
-      endpoint: params.endpoint.join('/'),
+      endpoint: endpoint.join('/'),
       status: 401,
       error: keyCheck.reason,
       source: 'public',
@@ -219,7 +228,7 @@ export async function PUT(
   }
 
   // 2️⃣ Find endpoint in Firestore
-  const endpointPath = '/' + params.endpoint.join('/');
+  const endpointPath = '/' + endpoint.join('/');
   try {
     const body = await req.json();
     const snap = await db.collection('api_endpoints').where('path', '==', endpointPath).where('isPublic', '==', true).limit(1).get();
@@ -271,19 +280,22 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { endpoint: string[] } }
+  { params }: { params: Promise<{ endpoint: string[] }> }
 ) {
   const startTime = Date.now();
   const url = new URL(req.url);
   const apiKey = url.searchParams.get('key') || req.headers.get('authorization')?.replace('Bearer ', '');
   const db = getFirestore();
   const unifiedService = UnifiedDatabaseService.getInstance();
+  
+  // Await params (Next.js 15+)
+  const { endpoint } = await params;
 
   // 1️⃣ Verify API key
   const keyCheck = await verifyApiKey(apiKey);
   if (!keyCheck.valid) {
     await logRequest({
-      endpoint: params.endpoint.join('/'),
+      endpoint: endpoint.join('/'),
       status: 401,
       error: keyCheck.reason,
       source: 'public',
@@ -295,7 +307,7 @@ export async function DELETE(
   }
 
   // 2️⃣ Find endpoint in Firestore
-  const endpointPath = '/' + params.endpoint.join('/');
+  const endpointPath = '/' + endpoint.join('/');
   try {
     const snap = await db.collection('api_endpoints').where('path', '==', endpointPath).where('isPublic', '==', true).limit(1).get();
     
