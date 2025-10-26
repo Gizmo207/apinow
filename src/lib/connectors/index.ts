@@ -7,6 +7,8 @@ import { MySQLAdapter } from './mysql';
 import { MongoDBAdapter } from './mongodb';
 import { SQLServerAdapter } from './sqlserver';
 import { SupabaseAdapter } from './supabase';
+import { RedisAdapter } from './redis';
+import { MariaDBAdapter } from './mariadb';
 
 export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseAdapter> {
   switch (config.type) {
@@ -41,6 +43,16 @@ export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseA
       await supabaseAdapter.connect();
       return supabaseAdapter;
     
+    case 'redis':
+      const redisAdapter = new RedisAdapter(config);
+      await redisAdapter.connect();
+      return redisAdapter;
+    
+    case 'mariadb':
+      const mariadbAdapter = new MariaDBAdapter(config);
+      await mariadbAdapter.connect();
+      return mariadbAdapter;
+    
     default:
       throw new Error(`Unsupported database type: ${config.type}`);
   }
@@ -54,3 +66,5 @@ export { MySQLAdapter } from './mysql';
 export { MongoDBAdapter } from './mongodb';
 export { SQLServerAdapter } from './sqlserver';
 export { SupabaseAdapter } from './supabase';
+export { RedisAdapter } from './redis';
+export { MariaDBAdapter } from './mariadb';
