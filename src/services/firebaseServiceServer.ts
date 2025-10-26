@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 
 /**
  * Initialize Firebase Admin for OUR app's Firestore
- * Uses service account credentials from JSON file
+ * Uses service account credentials from environment variable or falls back to minimal config
  */
 function getOurFirestoreAdmin() {
   const appName = 'our-app-firestore';
@@ -13,12 +13,23 @@ function getOurFirestoreAdmin() {
   } catch {
     console.log('[Firestore Server] Initializing Firebase Admin for our app');
     
-    // Load service account from file (project root)
-    const serviceAccount = require('../../firebase-service-account.json');
+    // Try to use environment variable for service account (production-safe)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        return admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id,
+        }, appName);
+      } catch (error) {
+        console.warn('[Firestore Server] Failed to parse service account from env:', (error as Error).message);
+      }
+    }
     
+    // Fallback: initialize with minimal config using project ID from env
+    console.log('[Firestore Server] Using minimal Firebase Admin config');
     return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      projectId: serviceAccount.project_id,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'api-now-bd858',
     }, appName);
   }
 }
