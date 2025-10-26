@@ -35,6 +35,11 @@ export function Settings() {
   const [allowedOrigins, setAllowedOrigins] = useState('*');
   const [savingSecurity, setSavingSecurity] = useState(false);
 
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(false);
+  const [generatingKey, setGeneratingKey] = useState(false);
+
   // Load user data and notification preferences on mount
   React.useEffect(() => {
     const loadUserData = async () => {
@@ -189,6 +194,123 @@ export function Settings() {
       alert('❌ Failed to save security settings');
     } finally {
       setSavingSecurity(false);
+    }
+  };
+
+  const loadApiKeys = React.useCallback(async () => {
+    setLoadingKeys(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        console.log('[API Keys] No user logged in');
+        return;
+      }
+
+      const token = await user.getIdToken();
+      console.log('[API Keys] Fetching keys...');
+      const response = await fetch('/api/api-keys', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      console.log('[API Keys] Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[API Keys] Loaded keys:', data.apiKeys?.length || 0);
+        setApiKeys(data.apiKeys || []);
+      } else {
+        const errorData = await response.json();
+        console.error('[API Keys] Failed to load:', errorData);
+      }
+    } catch (error) {
+      console.error('[API Keys] Failed to load:', error);
+    } finally {
+      setLoadingKeys(false);
+    }
+  }, []);
+
+  // Load API keys when tab changes to api-keys
+  React.useEffect(() => {
+    if (activeTab === 'api-keys') {
+      loadApiKeys();
+    }
+  }, [activeTab, loadApiKeys]);
+
+  const generateApiKey = async () => {
+    setGeneratingKey(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const keyName = prompt('Enter a name for this API key (e.g., "Production", "Mobile App"):');
+      if (!keyName) {
+        setGeneratingKey(false);
+        return;
+      }
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/api-keys/generate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: keyName }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate API key');
+      }
+
+      const data = await response.json();
+      alert(`✅ API Key Generated!\n\nKey: ${data.apiKey.key}\n\n⚠️ SAVE THIS KEY! It won't be shown again.`);
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(data.apiKey.key);
+      
+      // Reload keys
+      await loadApiKeys();
+    } catch (error) {
+      console.error('[API Keys] Failed to generate:', error);
+      alert('❌ Failed to generate API key');
+    } finally {
+      setGeneratingKey(false);
+    }
+  };
+
+  const copyApiKey = (key: string) => {
+    navigator.clipboard.writeText(key);
+    alert('✅ API Key copied to clipboard!');
+  };
+
+  const revokeApiKey = async (keyId: string, keyName: string) => {
+    if (!confirm(`Are you sure you want to revoke "${keyName}"?\n\nThis action cannot be undone and any services using this key will stop working.`)) {
+      return;
+    }
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/api-keys/revoke`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ keyId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to revoke API key');
+      }
+
+      alert('✅ API Key revoked successfully!');
+      await loadApiKeys();
+    } catch (error) {
+      console.error('[API Keys] Failed to revoke:', error);
+      alert('❌ Failed to revoke API key');
     }
   };
 
@@ -384,37 +506,89 @@ export function Settings() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">API Keys</h2>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                  Generate New Key
+                <button 
+                  onClick={generateApiKey}
+                  disabled={generatingKey}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generatingKey ? '⏳ Generating...' : '🔑 Generate New Key'}
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {[
-                  { name: 'Production Key', key: 'pk_live_xxxxxxxxxxxxxxxx', created: '2024-01-15', lastUsed: '2 minutes ago' },
-                  { name: 'Development Key', key: 'pk_test_xxxxxxxxxxxxxxxx', created: '2024-01-10', lastUsed: '1 hour ago' }
-                ].map((apiKey, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{apiKey.name}</h3>
-                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded mt-1 inline-block">
-                          {apiKey.key}
-                        </code>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button className="text-blue-600 hover:text-blue-700 text-sm">Copy</button>
-                        <button className="text-red-600 hover:text-red-700 text-sm">Revoke</button>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-sm text-gray-500">
-                      <span>Created: {apiKey.created}</span>
-                      <span className="mx-2">•</span>
-                      <span>Last used: {apiKey.lastUsed}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-2">🔑 What are API Keys?</h3>
+                <p className="text-sm text-blue-800">
+                  API keys let you access your generated APIs without needing to log in. Use them in:
+                </p>
+                <ul className="text-sm text-blue-800 mt-2 ml-4 list-disc">
+                  <li>Mobile apps</li>
+                  <li>Backend servers</li>
+                  <li>Third-party integrations</li>
+                </ul>
+                <p className="text-xs text-blue-700 mt-2">
+                  ⚠️ Keep your API keys secret! Never commit them to version control.
+                </p>
               </div>
+
+              {loadingKeys ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <p className="text-sm text-gray-600 mt-2">Loading API keys...</p>
+                </div>
+              ) : apiKeys.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg">
+                  <p className="text-gray-600 mb-2">🔑 No API keys yet</p>
+                  <p className="text-sm text-gray-500">Generate your first API key to get started!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {apiKeys.map((apiKey) => (
+                    <div key={apiKey.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">{apiKey.name}</h3>
+                          <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded mt-1 inline-block">
+                            {apiKey.keyPreview}...
+                          </code>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button 
+                            onClick={() => copyApiKey(apiKey.key)}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          >
+                            📋 Copy
+                          </button>
+                          <button 
+                            onClick={() => revokeApiKey(apiKey.id, apiKey.name)}
+                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                          >
+                            🗑️ Revoke
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-sm text-gray-500">
+                        <span>Created: {new Date(apiKey.createdAt).toLocaleDateString()}</span>
+                        <span className="mx-2">•</span>
+                        <span>Last used: {apiKey.lastUsed ? new Date(apiKey.lastUsed).toLocaleString() : 'Never'}</span>
+                      </div>
+                      <div className="mt-2">
+                        <span className={`inline-block px-2 py-1 text-xs rounded ${
+                          apiKey.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {apiKey.active ? '✅ Active' : '❌ Revoked'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={loadApiKeys}
+                className="w-full text-sm text-blue-600 hover:text-blue-700 py-2"
+              >
+                🔄 Refresh Keys
+              </button>
             </div>
           )}
 
