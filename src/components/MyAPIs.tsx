@@ -60,6 +60,14 @@ export function MyAPIs() {
   };
 
   const togglePublic = async (endpointId: string, currentStatus: boolean) => {
+    console.log('[MyAPIs] togglePublic called with endpointId:', endpointId, 'currentStatus:', currentStatus);
+    
+    if (!endpointId) {
+      console.error('[MyAPIs] ERROR: endpointId is empty or undefined!');
+      showToast('Error: Endpoint ID is missing', 'error');
+      return;
+    }
+    
     setTogglingId(endpointId);
     try {
       const { auth } = await import('../services/firebaseService');
@@ -238,7 +246,9 @@ export function MyAPIs() {
         </div>
       ) : (
         <div className="space-y-4">
-          {savedEndpoints.map((endpoint) => (
+          {savedEndpoints.map((endpoint) => {
+            console.log('[MyAPIs] Rendering endpoint:', { id: endpoint.id, name: endpoint.name, path: endpoint.path });
+            return (
             <div
               key={endpoint.id}
               className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
@@ -366,7 +376,8 @@ export function MyAPIs() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

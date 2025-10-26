@@ -15,7 +15,7 @@ export async function POST(
     console.log('[Toggle Public] User ID:', userId);
 
     const { isPublic } = await request.json();
-    const { endpointId } = params;
+    const { endpointId } = await params; // await params in Next.js 15+
     console.log('[Toggle Public] Endpoint ID:', endpointId, 'Setting isPublic to:', isPublic);
 
     const firestore = getOurFirestore();
