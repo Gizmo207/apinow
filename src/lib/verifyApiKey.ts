@@ -25,10 +25,20 @@ export async function verifyApiKey(apiKey: string | null | undefined): Promise<{
       return { valid: false, reason: 'API key expired' };
     }
 
-    // Update last used timestamp
+    // Check usage limit
+    const currentUsage = keyData?.usageCount || 0;
+    const usageLimit = keyData?.usageLimit || 0;
+    
+    if (usageLimit > 0 && currentUsage >= usageLimit) {
+      // Auto-disable key when limit reached
+      await keyDoc.ref.update({ status: 'inactive' });
+      return { valid: false, reason: 'Usage limit reached. Please upgrade your plan or contact support.' };
+    }
+
+    // Update last used timestamp and increment usage counter
     await keyDoc.ref.update({
       lastUsed: new Date(),
-      requestCount: (keyData?.requestCount || 0) + 1,
+      usageCount: (keyData?.usageCount || 0) + 1,
     });
 
     return { valid: true, keyData };

@@ -222,11 +222,14 @@ export async function PUT(
     // 3️⃣ Execute query via unified service
     const data = await unifiedService.executeAPIEndpoint(endpoint.connectionId, endpoint.id, {}, body);
     
+    // 4️⃣ Invalidate cache for this endpoint (PUT updates data)
+    await invalidateCache(`api:${endpointPath}:*`);
+    
     await logRequest({
       endpoint: endpointPath,
       status: 200,
       source: 'public',
-      apiKey: apiKey || undefined,
+      apiKey: apiKey || '',
       method: 'PUT',
       responseTime: Date.now() - startTime,
     });
@@ -294,11 +297,14 @@ export async function DELETE(
     // 3️⃣ Execute query via unified service
     const data = await unifiedService.executeAPIEndpoint(endpoint.connectionId, endpoint.id, {});
     
+    // 4️⃣ Invalidate cache for this endpoint (DELETE removes data)
+    await invalidateCache(`api:${endpointPath}:*`);
+    
     await logRequest({
       endpoint: endpointPath,
       status: 200,
       source: 'public',
-      apiKey: apiKey || undefined,
+      apiKey: apiKey || '',
       method: 'DELETE',
       responseTime: Date.now() - startTime,
     });
