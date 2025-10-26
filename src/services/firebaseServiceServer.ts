@@ -13,24 +13,23 @@ function getOurFirestoreAdmin() {
   } catch {
     console.log('[Firestore Server] Initializing Firebase Admin for our app');
     
-    // Try to use environment variable for service account (production-safe)
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        return admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          projectId: serviceAccount.project_id,
-        }, appName);
-      } catch (error) {
-        console.warn('[Firestore Server] Failed to parse service account from env:', (error as Error).message);
-      }
+    // Require service account key from environment
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      console.error('[Firestore Server] FIREBASE_SERVICE_ACCOUNT_KEY not found in environment variables');
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required but not set');
     }
     
-    // Fallback: initialize with minimal config using project ID from env
-    console.log('[Firestore Server] Using minimal Firebase Admin config');
-    return admin.initializeApp({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'api-now-bd858',
-    }, appName);
+    try {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      console.log('[Firestore Server] Successfully parsed service account for project:', serviceAccount.project_id);
+      return admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id,
+      }, appName);
+    } catch (error) {
+      console.error('[Firestore Server] Failed to parse or initialize Firebase Admin:', error);
+      throw new Error(`Failed to initialize Firebase Admin: ${(error as Error).message}`);
+    }
   }
 }
 
