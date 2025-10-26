@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, ExternalLink, Zap, RefreshCw, Shield, ShieldOff, CheckCircle, XCircle } from 'lucide-react';
+import { Trash2, ExternalLink, Zap, RefreshCw, Shield, ShieldOff, CheckCircle, XCircle, Globe, Lock } from 'lucide-react';
 
 export function MyAPIs() {
   const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
 
   useEffect(() => {
     loadSavedEndpoints();
+    loadApiKeys();
   }, []);
 
   useEffect(() => {
@@ -33,6 +36,81 @@ export function MyAPIs() {
       console.error('Failed to load endpoints:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadApiKeys = async () => {
+    try {
+      const { auth } = await import('../services/firebaseService');
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/api-keys', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeys(data.apiKeys || []);
+      }
+    } catch (error) {
+      console.error('Failed to load API keys:', error);
+    }
+  };
+
+  const togglePublic = async (endpointId: string, currentStatus: boolean) => {
+    setTogglingId(endpointId);
+    try {
+      const { auth } = await import('../services/firebaseService');
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.getIdToken();
+      console.log('[MyAPIs] Toggling endpoint:', endpointId, 'to:', !currentStatus);
+      
+      const response = await fetch(`/api/endpoints/${endpointId}/toggle-public`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isPublic: !currentStatus }),
+      });
+
+      console.log('[MyAPIs] Response status:', response.status);
+      console.log('[MyAPIs] Response content-type:', response.headers.get('content-type'));
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error('[MyAPIs] Error response text:', responseText);
+        
+        try {
+          const errorData = JSON.parse(responseText);
+          throw new Error(errorData.error || 'Failed to toggle endpoint visibility');
+        } catch (e) {
+          // Response wasn't JSON
+          throw new Error(`Server error (${response.status}): ${responseText.substring(0, 200)}`);
+        }
+      }
+
+      const result = await response.json();
+      console.log('[MyAPIs] Success result:', result);
+
+      // Update local state
+      setSavedEndpoints(prev => prev.map(ep => 
+        ep.id === endpointId ? { ...ep, isPublic: !currentStatus } : ep
+      ));
+
+      showToast(
+        `Endpoint is now ${!currentStatus ? 'PUBLIC 🌍' : 'PROTECTED 🔒'}`,
+        'success'
+      );
+    } catch (error: any) {
+      console.error('[MyAPIs] Failed to toggle endpoint:', error);
+      showToast(error.message || 'Failed to update endpoint', 'error');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -186,19 +264,65 @@ export function MyAPIs() {
                     <span className="flex items-center gap-1">
                       📊 Table: <code className="font-mono text-xs bg-gray-100 px-1 rounded">{endpoint.tableName}</code>
                     </span>
-                    {endpoint.authRequired ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <Shield className="w-4 h-4" />
-                        Protected
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-gray-500">
-                        <ShieldOff className="w-4 h-4" />
-                        Public
-                      </span>
-                    )}
                     {!endpoint.isActive && (
                       <span className="text-red-600 text-xs">● Inactive</span>
+                    )}
+                  </div>
+
+                  {/* Deploy Mode Toggle */}
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {endpoint.isPublic ? (
+                          <>
+                            <Globe className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-700">🌍 Public</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-700">🔒 Protected</span>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => togglePublic(endpoint.id, endpoint.isPublic)}
+                        disabled={togglingId === endpoint.id}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          endpoint.isPublic ? 'bg-green-600' : 'bg-gray-300'
+                        } disabled:opacity-50`}
+                        title={endpoint.isPublic ? 'Make Protected' : 'Make Public'}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          endpoint.isPublic ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                    
+                    {endpoint.isPublic ? (
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <div className="flex items-start gap-1">
+                          <span className="font-medium">Public URL:</span>
+                          <code className="flex-1 bg-white px-2 py-1 rounded text-xs break-all">
+                            {`${window.location.origin}/api/public${endpoint.path}`}
+                          </code>
+                        </div>
+                        {apiKeys.length > 0 && (
+                          <div className="text-xs text-green-700 mt-1">
+                            ✓ Add <code className="bg-white px-1 rounded">?key=YOUR_API_KEY</code> to the URL
+                          </div>
+                        )}
+                        {apiKeys.length === 0 && (
+                          <div className="text-xs text-yellow-700 mt-1">
+                            ⚠️ Generate an API key in Settings to use this endpoint
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-600">
+                        <div>Protected URL: <code className="bg-white px-1 rounded">{`${window.location.origin}/api/dynamic${endpoint.path}`}</code></div>
+                        <div className="text-gray-500 mt-1">Only accessible with Firebase authentication</div>
+                      </div>
                     )}
                   </div>
 
@@ -206,9 +330,12 @@ export function MyAPIs() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {
-                        const success = await copyToClipboard(`http://localhost:3000${endpoint.path}`);
+                        const url = endpoint.isPublic 
+                          ? `${window.location.origin}/api/public${endpoint.path}${apiKeys.length > 0 ? `?key=${apiKeys[0].key}` : '?key=YOUR_KEY'}`
+                          : `${window.location.origin}/api/dynamic${endpoint.path}`;
+                        const success = await copyToClipboard(url);
                         if (success) {
-                          showToast('Endpoint URL copied to clipboard!', 'success');
+                          showToast(`${endpoint.isPublic ? 'Public' : 'Protected'} URL copied!`, 'success');
                         } else {
                           showToast('Failed to copy URL', 'error');
                         }
@@ -216,7 +343,7 @@ export function MyAPIs() {
                       className="flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      Copy URL
+                      {endpoint.isPublic ? 'Copy Public URL' : 'Copy URL'}
                     </button>
                     <a
                       href={`#tester?url=${encodeURIComponent(`http://localhost:3000${endpoint.path}`)}`}
