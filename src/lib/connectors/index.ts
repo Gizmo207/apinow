@@ -6,6 +6,7 @@ import { PostgresAdapter } from './postgres';
 import { MySQLAdapter } from './mysql';
 import { MongoDBAdapter } from './mongodb';
 import { SQLServerAdapter } from './sqlserver';
+import { SupabaseAdapter } from './supabase';
 
 export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseAdapter> {
   switch (config.type) {
@@ -35,6 +36,11 @@ export async function connectDatabase(config: DatabaseConfig): Promise<DatabaseA
       await sqlServerAdapter.connect();
       return sqlServerAdapter;
     
+    case 'supabase':
+      const supabaseAdapter = new SupabaseAdapter(config);
+      await supabaseAdapter.connect();
+      return supabaseAdapter;
+    
     default:
       throw new Error(`Unsupported database type: ${config.type}`);
   }
@@ -47,3 +53,4 @@ export { PostgresAdapter } from './postgres';
 export { MySQLAdapter } from './mysql';
 export { MongoDBAdapter } from './mongodb';
 export { SQLServerAdapter } from './sqlserver';
+export { SupabaseAdapter } from './supabase';

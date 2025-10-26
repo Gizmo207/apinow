@@ -11,6 +11,6 @@ export interface DatabaseAdapter {
 }
 
 export interface DatabaseConfig {
-  type: 'firestore' | 'postgres' | 'mysql' | 'mongo' | 'sqlite' | 'sqlserver';
+  type: 'firestore' | 'postgres' | 'mysql' | 'mongo' | 'sqlite' | 'sqlserver' | 'supabase';
   [key: string]: any;
 }
