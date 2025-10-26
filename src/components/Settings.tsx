@@ -30,6 +30,11 @@ export function Settings() {
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [showTestReport, setShowTestReport] = useState(false);
 
+  // Security settings state
+  const [ipWhitelistEnabled, setIpWhitelistEnabled] = useState(false);
+  const [allowedOrigins, setAllowedOrigins] = useState('*');
+  const [savingSecurity, setSavingSecurity] = useState(false);
+
   // Load user data and notification preferences on mount
   React.useEffect(() => {
     const loadUserData = async () => {
@@ -152,6 +157,39 @@ export function Settings() {
 
   const handleManageSubscription = () => {
     alert('💳 Subscription management coming soon!\n\nThis will integrate with Stripe to let you:\n• Upgrade/downgrade plans\n• Update payment methods\n• View billing history\n• Cancel subscription');
+  };
+
+  const saveSecuritySettings = async () => {
+    setSavingSecurity(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/security/settings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ipWhitelistEnabled,
+          allowedOrigins: allowedOrigins.split(',').map(o => o.trim()).filter(Boolean),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save security settings');
+      }
+
+      alert('✅ Security settings saved successfully!');
+      console.log('[Security] Settings saved successfully');
+    } catch (error) {
+      console.error('[Security] Failed to save settings:', error);
+      alert('❌ Failed to save security settings');
+    } finally {
+      setSavingSecurity(false);
+    }
   };
 
   const toggleNotification = async (key: keyof typeof notificationPrefs) => {
@@ -382,23 +420,47 @@ export function Settings() {
 
           {activeTab === 'security' && (
             <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-gray-900">Security Settings</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Security Settings</h2>
+                {savingSecurity && (
+                  <span className="text-sm text-gray-500">Saving...</span>
+                )}
+              </div>
               
               <div className="space-y-6">
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">IP Whitelisting</h3>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <h3 className="font-medium text-gray-900 mb-3">🛡️ IP Whitelisting</h3>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-3">
                     <div>
-                      <p className="text-sm text-gray-900">Restrict API access to specific IP addresses</p>
+                      <p className="text-sm text-gray-900 font-medium">Restrict API access to specific IP addresses</p>
+                      <p className="text-xs text-gray-600 mt-1">Only whitelisted IPs can call your API endpoints</p>
                     </div>
-                    <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200">
-                      <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1" />
+                    <button 
+                      onClick={() => setIpWhitelistEnabled(!ipWhitelistEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        ipWhitelistEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        ipWhitelistEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
                     </button>
                   </div>
+                  
+                  {ipWhitelistEnabled && (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                      <p className="text-sm text-gray-700 mb-2">
+                        ⚠️ <strong>IP Whitelisting is ENABLED</strong>. Only requests from your current IP will be allowed.
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        Your IP will be automatically detected and whitelisted when you save.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">CORS Settings</h3>
+                  <h3 className="font-medium text-gray-900 mb-3">🌐 CORS Settings</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -406,27 +468,46 @@ export function Settings() {
                       </label>
                       <input
                         type="text"
-                        defaultValue="*"
+                        value={allowedOrigins}
+                        onChange={(e) => setAllowedOrigins(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="https://example.com, https://app.example.com"
                       />
                     </div>
-                    <p className="text-sm text-gray-500">Use * to allow all origins (not recommended for production)</p>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <p className="text-sm text-yellow-800">
+                        <strong>*</strong> = Allow all origins (not secure for production)
+                      </p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        For production, specify your domains: <code className="bg-yellow-100 px-1">https://yourdomain.com</code>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">SSL/TLS</h3>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <h3 className="font-medium text-gray-900 mb-3">🔒 SSL/TLS</h3>
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                     <div>
-                      <p className="text-sm text-green-900">Force HTTPS for all API endpoints</p>
-                      <p className="text-xs text-green-700">All connections are automatically encrypted</p>
+                      <p className="text-sm text-green-900 font-medium">Force HTTPS for all API endpoints</p>
+                      <p className="text-xs text-green-700">All connections are automatically encrypted ✅</p>
                     </div>
                     <div className="bg-green-500 h-6 w-11 rounded-full flex items-center justify-end px-1">
                       <span className="h-4 w-4 bg-white rounded-full" />
                     </div>
                   </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    SSL/TLS is always enabled and cannot be disabled for security reasons.
+                  </p>
                 </div>
+
+                <button
+                  onClick={saveSecuritySettings}
+                  disabled={savingSecurity}
+                  className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {savingSecurity ? 'Saving...' : '💾 Save Security Settings'}
+                </button>
               </div>
             </div>
           )}
