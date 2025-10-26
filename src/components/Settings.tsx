@@ -20,11 +20,11 @@ export function Settings() {
         setActiveTab(tabParam);
       }
       
-      // Show success/cancel message if coming from Stripe
+      // Log Stripe return status
       if (statusParam === 'success') {
-        showToast('Payment successful! Your plan has been upgraded.', 'success');
+        console.log('[Settings] Payment successful!');
       } else if (statusParam === 'cancelled') {
-        showToast('Payment cancelled. You can upgrade anytime.', 'info');
+        console.log('[Settings] Payment cancelled');
       }
     }
   }, []);

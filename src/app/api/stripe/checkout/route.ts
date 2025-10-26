@@ -3,7 +3,7 @@ import { verifyAuthToken } from '@/lib/serverAuth';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2025-09-30.clover',
 });
 
 export async function POST(request: NextRequest) {
@@ -20,6 +20,10 @@ export async function POST(request: NextRequest) {
 
     console.log('[Stripe Checkout] Creating session for user:', userId, 'priceId:', priceId);
 
+    // Get base URL from request origin or env
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+    console.log('[Stripe Checkout] Using origin:', origin);
+
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -31,8 +35,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       customer_email: email,
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings?tab=billing&status=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings?tab=billing&status=cancelled`,
+      success_url: `${origin}/settings?tab=billing&status=success`,
+      cancel_url: `${origin}/settings?tab=billing&status=cancelled`,
       metadata: {
         userId,
       },
