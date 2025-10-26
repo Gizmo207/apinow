@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { verifyApiKey } from '@/lib/verifyApiKey';
 import { UnifiedDatabaseService } from '@/utils/unifiedDatabase';
 import { logRequest } from '@/lib/logRequest';
+import { getCached, setCached, generateCacheKey, invalidateCache } from '@/lib/cache';
 
 export async function GET(
   req: Request,
@@ -13,6 +14,24 @@ export async function GET(
   const apiKey = url.searchParams.get('key') || req.headers.get('authorization')?.replace('Bearer ', '');
   const db = getFirestore();
   const unifiedService = UnifiedDatabaseService.getInstance();
+
+  // Generate cache key
+  const endpointPath = '/' + params.endpoint.join('/');
+  const cacheKey = generateCacheKey(endpointPath, url.searchParams);
+  
+  // Try cache first (before auth to speed up public cached responses)
+  const cached = await getCached(cacheKey);
+  if (cached) {
+    await logRequest({
+      endpoint: endpointPath,
+      status: 200,
+      source: 'public',
+      apiKey: apiKey || '',
+      method: 'GET',
+      responseTime: Date.now() - startTime,
+    });
+    return NextResponse.json({ success: true, data: cached, cached: true });
+  }
 
   // 1️⃣ Verify API key
   const keyCheck = await verifyApiKey(apiKey);
@@ -30,7 +49,6 @@ export async function GET(
   }
 
   // 2️⃣ Find endpoint in Firestore
-  const endpointPath = '/' + params.endpoint.join('/');
   try {
     const snap = await db.collection('api_endpoints').where('path', '==', endpointPath).where('isPublic', '==', true).limit(1).get();
     
@@ -52,16 +70,19 @@ export async function GET(
     // 3️⃣ Execute query via unified service
     const data = await unifiedService.executeAPIEndpoint(endpoint.connectionId, endpoint.id, {});
     
+    // 4️⃣ Cache the result
+    await setCached(cacheKey, data, 60); // Cache for 60 seconds
+    
     await logRequest({
       endpoint: endpointPath,
       status: 200,
       source: 'public',
-      apiKey: apiKey || undefined,
+      apiKey: apiKey || '',
       method: 'GET',
       responseTime: Date.now() - startTime,
     });
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data, cached: false });
   } catch (err: any) {
     await logRequest({
       endpoint: endpointPath,
@@ -125,11 +146,14 @@ export async function POST(
     // 3️⃣ Execute query via unified service
     const data = await unifiedService.executeAPIEndpoint(endpoint.connectionId, endpoint.id, {}, body);
     
+    // 4️⃣ Invalidate cache for this endpoint (POST creates new data)
+    await invalidateCache(`api:${endpointPath}:*`);
+    
     await logRequest({
       endpoint: endpointPath,
       status: 200,
       source: 'public',
-      apiKey: apiKey || undefined,
+      apiKey: apiKey || '',
       method: 'POST',
       responseTime: Date.now() - startTime,
     });
