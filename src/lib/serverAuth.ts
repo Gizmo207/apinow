@@ -6,16 +6,24 @@ function getAuthAdmin() {
   try {
     return admin.app('auth-app');
   } catch {
-    // For development: initialize with minimal config for token verification only
-    // We don't need full service account for just verifying tokens
     if (!admin.apps.length || !admin.apps.find(app => app?.name === 'auth-app')) {
       console.log('[Server Auth] Initializing Firebase Admin for token verification');
       
-      // Initialize without credentials - Firebase Admin can verify tokens
-      // using the project ID alone (tokens are self-verifying)
-      return admin.initializeApp({
-        projectId: 'api-now-bd858', // Your Firebase project ID
-      }, 'auth-app');
+      try {
+        // Load service account from static import (Next.js compatible)
+        const serviceAccount = require('../../firebase-service-account.json');
+        
+        return admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: 'api-now-bd858',
+        }, 'auth-app');
+      } catch (credError) {
+        console.warn('[Server Auth] Could not load service account:', (credError as Error).message);
+        // Fallback to minimal config (works but less secure)
+        return admin.initializeApp({
+          projectId: 'api-now-bd858',
+        }, 'auth-app');
+      }
     }
     return admin.app('auth-app');
   }

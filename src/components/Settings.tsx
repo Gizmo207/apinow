@@ -8,6 +8,26 @@ export function Settings() {
   const [tokenCopied, setTokenCopied] = useState(false);
   const [token, setToken] = useState('');
   const [gettingToken, setGettingToken] = useState(false);
+
+  // Read tab from URL on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      const statusParam = params.get('status');
+      
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+      
+      // Show success/cancel message if coming from Stripe
+      if (statusParam === 'success') {
+        showToast('Payment successful! Your plan has been upgraded.', 'success');
+      } else if (statusParam === 'cancelled') {
+        showToast('Payment cancelled. You can upgrade anytime.', 'info');
+      }
+    }
+  }, []);
   
   // Account settings state
   const [displayName, setDisplayName] = useState('');
