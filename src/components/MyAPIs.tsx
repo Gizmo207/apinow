@@ -449,7 +449,7 @@ export function MyAPIs() {
                     </button>
                     {!endpoint.path.includes(':id') && (
                       <a
-                        href={`#tester?url=${encodeURIComponent(`${window.location.origin}${endpoint.path}`)}`}
+                        href={`#tester?url=${encodeURIComponent(`${window.location.origin}${endpoint.path}`)}&method=${endpoint.method}`}
                         className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
                       >
                         <Zap className="w-4 h-4" />
