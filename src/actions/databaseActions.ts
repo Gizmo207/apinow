@@ -123,7 +123,7 @@ export async function generateEndpointsAction(connectionId: string, connection?:
         throw new Error(introspectResult.error || 'Failed to introspect database');
       }
       
-      const collections = introspectResult.tables.map(t => t.name);
+      const collections = introspectResult.tables.filter((t): t is NonNullable<typeof t> => t !== null).map(t => t.name);
       
       // Generate endpoints manually
       const endpoints: any[] = [];
