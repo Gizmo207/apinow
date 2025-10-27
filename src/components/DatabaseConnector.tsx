@@ -282,7 +282,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
               </div>
             </div>
 
-            {formData.type !== 'sqlite' && formData.type !== 'firebase' && (
+            {formData.type !== 'sqlite' && formData.type !== 'firebase' && formData.type !== 'supabase' && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -409,7 +409,44 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
               </div>
             )}
 
-            {formData.type !== 'sqlite' && formData.type !== 'firebase' && (
+            {formData.type === 'supabase' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Supabase URL
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.supabaseUrl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, supabaseUrl: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="https://your-project.supabase.co"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Find this in your Supabase project settings
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Supabase Anon/Service Key
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.supabaseKey}
+                    onChange={(e) => setFormData(prev => ({ ...prev, supabaseKey: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use the anon key for public access or service role key for admin access
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {formData.type !== 'sqlite' && formData.type !== 'firebase' && formData.type !== 'supabase' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Database Name
@@ -441,7 +478,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
               </div>
             )}
 
-            {formData.type !== 'sqlite' && formData.type !== 'firebase' && (
+            {formData.type !== 'sqlite' && formData.type !== 'firebase' && formData.type !== 'supabase' && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
