@@ -145,6 +145,29 @@ export class UnifiedDatabaseService {
           throw new Error(`Unsupported database type: ${connection.type}`);
       }
 
+      // For Supabase, don't actually connect client-side - it will use API routes
+      if (connection.type === 'supabase' && typeof window !== 'undefined') {
+        // Create a mock adapter for client-side
+        const mockAdapter = {
+          type: 'supabase',
+          connect: async () => {},
+          disconnect: async () => {},
+          listCollections: async () => [],
+          listDocuments: async () => [],
+          create: async () => ({}),
+          read: async () => ({}),
+          update: async () => ({}),
+          delete: async () => ({ success: true })
+        } as any;
+        
+        this.adapters.set(connection.id, mockAdapter);
+        const apiGenerator = new DatabaseAPIGenerator(mockAdapter);
+        this.apiGenerators.set(connection.id, apiGenerator);
+        
+        console.log(`Supabase connection registered (server-side only): ${connection.name}`);
+        return mockAdapter;
+      }
+
       const adapter = await connectDatabase(config);
       this.adapters.set(connection.id, adapter);
 
