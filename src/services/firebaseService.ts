@@ -22,7 +22,7 @@ export interface DatabaseConnection {
   id: string;
   userId: string;
   name: string;
-  type: 'postgresql' | 'mysql' | 'sqlite' | 'firebase';
+  type: 'postgresql' | 'mysql' | 'sqlite' | 'firebase' | 'supabase' | 'mongodb' | 'redis' | 'sqlserver' | 'mariadb' | 'dynamodb' | 'oracle' | 'cassandra';
   host?: string;
   port?: string;
   databaseName?: string;
@@ -36,6 +36,14 @@ export interface DatabaseConnection {
   adminAuthDomain?: string;
   databaseURL?: string;
   storageBucket?: string;
+  // Supabase specific
+  supabaseUrl?: string;
+  supabaseKey?: string;
+  // Other database specific
+  connectionString?: string;
+  region?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
   status: string;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -94,6 +102,14 @@ export class FirebaseService {
       adminAuthDomain: connection.adminAuthDomain,
       databaseURL: connection.databaseURL,
       storageBucket: connection.storageBucket,
+      // Supabase specific
+      supabaseUrl: connection.supabaseUrl,
+      supabaseKey: connection.supabaseKey,
+      // Other database specific
+      connectionString: connection.connectionString,
+      region: connection.region || connection.awsRegion,
+      accessKeyId: connection.accessKeyId || connection.awsAccessKey,
+      secretAccessKey: connection.secretAccessKey || connection.awsSecretKey,
       status: 'connected',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()

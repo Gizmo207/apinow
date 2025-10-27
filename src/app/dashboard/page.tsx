@@ -100,6 +100,12 @@ export default function DashboardPage() {
           adminAuthDomain: conn.adminAuthDomain,
           databaseURL: conn.databaseURL,
           storageBucket: conn.storageBucket,
+          supabaseUrl: conn.supabaseUrl,
+          supabaseKey: conn.supabaseKey,
+          connectionString: conn.connectionString,
+          region: conn.region,
+          accessKeyId: conn.accessKeyId,
+          secretAccessKey: conn.secretAccessKey,
           connected: conn.status === 'connected',
           createdAt: conn.createdAt
         }));
@@ -146,6 +152,12 @@ export default function DashboardPage() {
         adminAuthDomain: conn.adminAuthDomain,
         databaseURL: conn.databaseURL,
         storageBucket: conn.storageBucket,
+        supabaseUrl: conn.supabaseUrl,
+        supabaseKey: conn.supabaseKey,
+        connectionString: conn.connectionString,
+        region: conn.region,
+        accessKeyId: conn.accessKeyId,
+        secretAccessKey: conn.secretAccessKey,
         connected: conn.status === 'connected',
         createdAt: conn.createdAt
       }));
