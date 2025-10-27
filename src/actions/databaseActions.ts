@@ -8,6 +8,78 @@ import { DatabaseConnection } from '../utils/database';
  */
 export async function introspectDatabaseAction(connection: DatabaseConnection) {
   try {
+    // For Supabase, use direct introspection
+    if (connection.type === 'supabase' && connection.supabaseUrl && connection.supabaseKey) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(connection.supabaseUrl, connection.supabaseKey);
+
+      // Use PostgREST introspection endpoint
+      const introspectUrl = `${connection.supabaseUrl}/rest/v1/`;
+      const response = await fetch(introspectUrl, {
+        headers: {
+          'apikey': connection.supabaseKey,
+          'Authorization': `Bearer ${connection.supabaseKey}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to introspect Supabase: ${response.statusText}`);
+      }
+
+      const openApiSpec = await response.json();
+      const tableNames: string[] = [];
+      if (openApiSpec.paths) {
+        for (const path of Object.keys(openApiSpec.paths)) {
+          const match = path.match(/^\/([^/]+)$/);
+          if (match && match[1]) {
+            tableNames.push(match[1]);
+          }
+        }
+      }
+
+      // Get sample data for each table
+      const tables = await Promise.all(
+        tableNames.map(async (tableName: string) => {
+          try {
+            const { data: rows } = await supabase
+              .from(tableName)
+              .select('*')
+              .limit(5);
+
+            const columns: any[] = [];
+            if (rows && rows.length > 0) {
+              const allKeys = new Set<string>();
+              rows.forEach((row: any) => {
+                Object.keys(row).forEach(key => allKeys.add(key));
+              });
+
+              allKeys.forEach(key => {
+                const sampleValue = rows.find((row: any) => row[key] !== undefined)?.[key];
+                columns.push({
+                  name: key,
+                  type: typeof sampleValue,
+                  nullable: true
+                });
+              });
+            }
+
+            return {
+              id: `table_${tableName}`,
+              name: tableName,
+              type: 'table',
+              columns,
+              rowCount: rows?.length || 0
+            };
+          } catch (error) {
+            return null;
+          }
+        })
+      );
+
+      return { success: true, tables: tables.filter((t: any) => t !== null) };
+    }
+
+    // For other database types, use unified service
     const unifiedService = UnifiedDatabaseService.getInstance();
     await unifiedService.connectToDatabase(connection);
     const tables = await unifiedService.introspectDatabase(connection.id, connection);
@@ -43,6 +115,67 @@ export async function getTableDataAction(connectionId: string, tableName: string
  */
 export async function generateEndpointsAction(connectionId: string, connection?: DatabaseConnection) {
   try {
+    // For Supabase/Firebase, we need to introspect directly since we're on the server
+    if (connection && (connection.type === 'supabase' || connection.type === 'firebase')) {
+      // Get tables first via introspection
+      const introspectResult = await introspectDatabaseAction(connection);
+      if (!introspectResult.success || !introspectResult.tables) {
+        throw new Error(introspectResult.error || 'Failed to introspect database');
+      }
+      
+      const collections = introspectResult.tables.map(t => t.name);
+      
+      // Generate endpoints manually
+      const endpoints: any[] = [];
+      for (const collection of collections) {
+        endpoints.push(
+          {
+            id: `${collection}-list`,
+            collection,
+            method: 'GET',
+            path: `/${collection}`,
+            description: `List all documents in ${collection}`,
+            enabled: true
+          },
+          {
+            id: `${collection}-get`,
+            collection,
+            method: 'GET',
+            path: `/${collection}/{id}`,
+            description: `Get a single document from ${collection}`,
+            enabled: true
+          },
+          {
+            id: `${collection}-create`,
+            collection,
+            method: 'POST',
+            path: `/${collection}`,
+            description: `Create a new document in ${collection}`,
+            enabled: true
+          },
+          {
+            id: `${collection}-update`,
+            collection,
+            method: 'PUT',
+            path: `/${collection}/{id}`,
+            description: `Update a document in ${collection}`,
+            enabled: true
+          },
+          {
+            id: `${collection}-delete`,
+            collection,
+            method: 'DELETE',
+            path: `/${collection}/{id}`,
+            description: `Delete a document from ${collection}`,
+            enabled: true
+          }
+        );
+      }
+      
+      return { success: true, endpoints };
+    }
+    
+    // For other database types, use the unified service
     const unifiedService = UnifiedDatabaseService.getInstance();
     const endpoints = await unifiedService.generateAPIEndpoints(connectionId, connection);
     return { success: true, endpoints };
