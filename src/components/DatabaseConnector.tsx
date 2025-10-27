@@ -159,6 +159,15 @@ export function DatabaseConnector({ databases, onAdd, onDelete, onTest }: Databa
           adminAuthDomain: formData.adminAuthDomain,
           databaseURL: formData.databaseURL,
           storageBucket: formData.storageBucket,
+          // Supabase fields
+          supabaseUrl: formData.supabaseUrl,
+          supabaseKey: formData.supabaseKey,
+          // Other database fields
+          connectionString: formData.connectionString,
+          awsRegion: formData.awsRegion,
+          awsAccessKey: formData.awsAccessKey,
+          awsSecretKey: formData.awsSecretKey,
+          redisPassword: formData.redisPassword,
           connected: true,
           createdAt: new Date().toISOString()
         };
