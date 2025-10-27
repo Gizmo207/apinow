@@ -2,6 +2,7 @@
 
 import { UnifiedDatabaseService } from '../utils/unifiedDatabase';
 import { DatabaseConnection } from '../utils/database';
+import * as admin from 'firebase-admin';
 
 /**
  * Server action to connect to a database and introspect its schema
@@ -79,6 +80,64 @@ export async function introspectDatabaseAction(connection: DatabaseConnection) {
       return { success: true, tables: tables.filter((t: any) => t !== null) };
     }
 
+    // Handle Firebase with Admin SDK directly to avoid API route auth issues
+    if (connection.type === 'firebase' && connection.serviceAccountKey) {
+      try {
+        // Initialize or reuse a named admin app per project
+        const appName = `introspect-${connection.projectId || 'default'}`;
+        let app: admin.app.App;
+        try {
+          app = admin.app(appName);
+        } catch {
+          const svc = JSON.parse(connection.serviceAccountKey);
+          app = admin.initializeApp({
+            credential: admin.credential.cert(svc),
+            projectId: svc.project_id,
+          }, appName);
+        }
+        const db = admin.firestore(app);
+
+        // List collections and sample documents
+        const collections = await db.listCollections();
+        const collectionNames = collections.map((c: any) => c.id);
+
+        const tables = await Promise.all(
+          collectionNames.map(async (collectionName) => {
+            try {
+              const snapshot = await db.collection(collectionName).limit(5).get();
+              const sampleDocs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+
+              const columns: any[] = [];
+              if (sampleDocs.length > 0) {
+                const allKeys = new Set<string>();
+                sampleDocs.forEach(doc => Object.keys(doc).forEach(k => allKeys.add(k)));
+                allKeys.forEach(key => {
+                  const sampleValue = sampleDocs.find(d => d[key] !== undefined)?.[key];
+                  columns.push({ name: key, type: typeof sampleValue, nullable: true });
+                });
+              }
+
+              return {
+                id: `collection_${collectionName}`,
+                name: collectionName,
+                type: 'collection',
+                columns,
+                rowCount: snapshot.size,
+              };
+            } catch (e) {
+              console.error(`Error accessing collection ${collectionName}:`, e);
+              return null;
+            }
+          })
+        );
+
+        return { success: true, tables: tables.filter((t: any) => t !== null) };
+      } catch (error) {
+        console.error('Firebase introspection failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to introspect Firebase' };
+      }
+    }
+
     // For other database types, use unified service
     const unifiedService = UnifiedDatabaseService.getInstance();
     await unifiedService.connectToDatabase(connection);
@@ -123,7 +182,9 @@ export async function generateEndpointsAction(connectionId: string, connection?:
         throw new Error(introspectResult.error || 'Failed to introspect database');
       }
       
-      const collections = introspectResult.tables.filter((t): t is NonNullable<typeof t> => t !== null).map(t => t.name);
+      const collections = introspectResult.tables
+        .filter((t: any) => t !== null)
+        .map((t: any) => t.name);
       
       // Generate endpoints manually
       const endpoints: any[] = [];
