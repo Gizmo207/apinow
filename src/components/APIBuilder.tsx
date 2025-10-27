@@ -34,11 +34,37 @@ export function APIBuilder({ databases = [], onEndpointsChange }: APIBuilderProp
       try {
         const { introspectDatabaseAction, connectToDatabaseAction } = await import('../actions/databaseActions');
         
+        const sanitizeForServer = (obj: any) => {
+          if (!obj || typeof obj !== 'object') return obj;
+          const out: any = Array.isArray(obj) ? [] : {};
+          for (const [k, v] of Object.entries(obj)) {
+            if (v && typeof v === 'object') {
+              if (typeof (v as any).seconds === 'number' && typeof (v as any).nanoseconds === 'number') {
+                const millis = (v as any).seconds * 1000 + Math.floor((v as any).nanoseconds / 1e6);
+                out[k] = new Date(millis).toISOString();
+                continue;
+              }
+              if (v instanceof Date || typeof (v as any).toDate === 'function' || typeof (v as any).toJSON === 'function') {
+                try {
+                  const asDate = v instanceof Date ? v : (typeof (v as any).toDate === 'function' ? (v as any).toDate() : new Date((v as any).toString()));
+                  out[k] = new Date(asDate).toISOString();
+                  continue;
+                } catch {}
+              }
+              out[k] = sanitizeForServer(v);
+            } else {
+              out[k] = v;
+            }
+          }
+          return out;
+        };
+        const safeDb = sanitizeForServer(selectedDatabase);
+        
         // Connect to database using server action
-        await connectToDatabaseAction(selectedDatabase);
+        await connectToDatabaseAction(safeDb as any);
         
         // Introspect database schema via server action
-        const result = await introspectDatabaseAction(selectedDatabase);
+        const result = await introspectDatabaseAction(safeDb as any);
         if (result.success && result.tables) {
           setTables(result.tables);
           console.log('API Builder loaded tables:', result.tables.map(t => t.name));

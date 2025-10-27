@@ -193,7 +193,19 @@ export class UnifiedDatabaseService {
     // For Firebase and Supabase, use server-side API route
     if ((adapter.type === 'firestore' || adapter.type === 'supabase') && connection) {
       try {
-        const response = await fetch('/api/database/introspect', {
+        const getBaseUrl = () => {
+          if (typeof window !== 'undefined' && window.location) {
+            return window.location.origin;
+          }
+          const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
+          if (envUrl) {
+            return envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+          }
+          return 'http://localhost:3000';
+        };
+        const introspectUrl = new URL('/api/database/introspect', getBaseUrl()).toString();
+
+        const response = await fetch(introspectUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connection })
@@ -276,7 +288,19 @@ export class UnifiedDatabaseService {
     // For Firebase and Supabase, get collections via server-side API
     if ((adapter.type === 'firestore' || adapter.type === 'supabase') && connection) {
       try {
-        const response = await fetch('/api/database/introspect', {
+        const getBaseUrl = () => {
+          if (typeof window !== 'undefined' && window.location) {
+            return window.location.origin;
+          }
+          const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
+          if (envUrl) {
+            return envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+          }
+          return 'http://localhost:3000';
+        };
+        const introspectUrl = new URL('/api/database/introspect', getBaseUrl()).toString();
+
+        const response = await fetch(introspectUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connection })

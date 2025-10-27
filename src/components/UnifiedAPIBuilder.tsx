@@ -53,11 +53,41 @@ export function UnifiedAPIBuilder({ databases }: UnifiedAPIBuilderProps) {
     await generateEndpoints(db);
   };
 
+  const sanitizeForServer = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    const out: any = Array.isArray(obj) ? [] : {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v === 'object') {
+        // Firestore Timestamp-like object
+        // Detect by presence of seconds and nanoseconds or toDate function
+        if (typeof (v as any).seconds === 'number' && typeof (v as any).nanoseconds === 'number') {
+          const millis = (v as any).seconds * 1000 + Math.floor((v as any).nanoseconds / 1e6);
+          out[k] = new Date(millis).toISOString();
+          continue;
+        }
+        if (v instanceof Date || typeof (v as any).toDate === 'function' || typeof (v as any).toJSON === 'function') {
+          try {
+            const asDate = v instanceof Date ? v : (typeof (v as any).toDate === 'function' ? (v as any).toDate() : new Date((v as any).toString()));
+            out[k] = new Date(asDate).toISOString();
+            continue;
+          } catch {
+            // fallthrough to deep clone
+          }
+        }
+        out[k] = sanitizeForServer(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  };
+
   const generateEndpoints = async (db: DatabaseConnection) => {
     setLoading(true);
     try {
-      await connectToDatabaseAction(db);
-      const result = await generateEndpointsAction(db.id, db);
+      const safeDb = sanitizeForServer(db);
+      await connectToDatabaseAction(safeDb as any);
+      const result = await generateEndpointsAction(db.id, safeDb as any);
       
       if (result.success && result.endpoints) {
         const unsaved = result.endpoints.filter(ep => 
