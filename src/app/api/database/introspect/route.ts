@@ -25,6 +25,89 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Connection details required' }, { status: 400 });
     }
 
+    // Handle Supabase
+    if (connection.type === 'supabase' && connection.supabaseUrl && connection.supabaseKey) {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(connection.supabaseUrl, connection.supabaseKey);
+
+        // Query information_schema to get table names
+        const { data: tables, error } = await supabase
+          .from('information_schema.tables')
+          .select('table_name')
+          .eq('table_schema', 'public')
+          .eq('table_type', 'BASE TABLE');
+
+        if (error) {
+          console.error('Supabase schema query error:', error);
+          return NextResponse.json({ 
+            error: 'Failed to query Supabase schema',
+            details: error.message
+          }, { status: 500 });
+        }
+
+        const tableNames = tables?.map((t: any) => t.table_name) || [];
+        
+        // Get sample data and columns for each table
+        const tableResults = await Promise.all(
+          tableNames.map(async (tableName: string) => {
+            try {
+              const { data: rows, error: rowError } = await supabase
+                .from(tableName)
+                .select('*')
+                .limit(5);
+
+              if (rowError) {
+                console.error(`Error accessing table ${tableName}:`, rowError);
+                return null;
+              }
+
+              // Infer columns from sample data
+              const columns: any[] = [];
+              if (rows && rows.length > 0) {
+                const allKeys = new Set<string>();
+                rows.forEach((row: any) => {
+                  Object.keys(row).forEach(key => allKeys.add(key));
+                });
+
+                allKeys.forEach(key => {
+                  const sampleValue = rows.find((row: any) => row[key] !== undefined)?.[key];
+                  columns.push({
+                    name: key,
+                    type: typeof sampleValue,
+                    nullable: true
+                  });
+                });
+              }
+
+              return {
+                id: `table_${tableName}`,
+                name: tableName,
+                type: 'table',
+                columns,
+                rowCount: rows?.length || 0
+              };
+            } catch (error) {
+              console.error(`Error accessing table ${tableName}:`, error);
+              return null;
+            }
+          })
+        );
+
+        return NextResponse.json({
+          tables: tableResults.filter((t: any) => t !== null),
+          collections: tableNames
+        });
+
+      } catch (error) {
+        console.error('Supabase introspection error:', error);
+        return NextResponse.json({ 
+          error: 'Failed to introspect Supabase database',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
+      }
+    }
+
     // Handle Firebase/Firestore
     if (connection.type === 'firebase' && connection.serviceAccountKey) {
       try {

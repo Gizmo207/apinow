@@ -167,8 +167,8 @@ export class UnifiedDatabaseService {
       throw new Error(`No adapter found for connection: ${connectionId}`);
     }
 
-    // For Firebase, use server-side API route
-    if (adapter.type === 'firestore' && connection) {
+    // For Firebase and Supabase, use server-side API route
+    if ((adapter.type === 'firestore' || adapter.type === 'supabase') && connection) {
       try {
         const response = await fetch('/api/database/introspect', {
           method: 'POST',
@@ -183,7 +183,7 @@ export class UnifiedDatabaseService {
         const data = await response.json();
         return data.tables || [];
       } catch (error) {
-        console.error('Failed to introspect Firebase via API:', error);
+        console.error('Failed to introspect database via API:', error);
         throw error;
       }
     }
@@ -250,8 +250,8 @@ export class UnifiedDatabaseService {
       throw new Error(`No API generator found for connection: ${connectionId}`);
     }
 
-    // For Firebase, get collections via server-side API
-    if (adapter.type === 'firestore' && connection) {
+    // For Firebase and Supabase, get collections via server-side API
+    if ((adapter.type === 'firestore' || adapter.type === 'supabase') && connection) {
       try {
         const response = await fetch('/api/database/introspect', {
           method: 'POST',
