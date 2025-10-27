@@ -67,7 +67,7 @@ export function APIBuilder({ databases = [], onEndpointsChange }: APIBuilderProp
         const result = await introspectDatabaseAction(safeDb as any);
         if (result.success && result.tables) {
           setTables(result.tables);
-          console.log('API Builder loaded tables:', result.tables.map(t => t.name));
+          console.log('API Builder loaded tables:', result.tables.map(t => t?.name));
         } else {
           console.error('Failed to load tables:', result.error);
           setTables([]);
