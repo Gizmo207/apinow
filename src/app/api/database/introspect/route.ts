@@ -31,22 +31,31 @@ export async function POST(request: NextRequest) {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(connection.supabaseUrl, connection.supabaseKey);
 
-        // Query information_schema to get table names
-        const { data: tables, error } = await supabase
-          .from('information_schema.tables')
-          .select('table_name')
-          .eq('table_schema', 'public')
-          .eq('table_type', 'BASE TABLE');
+        // Use PostgREST introspection endpoint to get all tables
+        const introspectUrl = `${connection.supabaseUrl}/rest/v1/`;
+        const response = await fetch(introspectUrl, {
+          headers: {
+            'apikey': connection.supabaseKey,
+            'Authorization': `Bearer ${connection.supabaseKey}`
+          }
+        });
 
-        if (error) {
-          console.error('Supabase schema query error:', error);
-          return NextResponse.json({ 
-            error: 'Failed to query Supabase schema',
-            details: error.message
-          }, { status: 500 });
+        if (!response.ok) {
+          throw new Error(`Failed to introspect Supabase: ${response.statusText}`);
         }
 
-        const tableNames = tables?.map((t: any) => t.table_name) || [];
+        const openApiSpec = await response.json();
+        // Extract table names from OpenAPI paths
+        const tableNames: string[] = [];
+        if (openApiSpec.paths) {
+          for (const path of Object.keys(openApiSpec.paths)) {
+            // Paths look like "/{table_name}"
+            const match = path.match(/^\/([^/]+)$/);
+            if (match && match[1]) {
+              tableNames.push(match[1]);
+            }
+          }
+        }
         
         // Get sample data and columns for each table
         const tableResults = await Promise.all(
