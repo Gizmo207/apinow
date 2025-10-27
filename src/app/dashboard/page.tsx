@@ -48,21 +48,27 @@ export default function DashboardPage() {
       const hash = window.location.hash.substring(1).split('?')[0];
       if (hash && ['dashboard', 'databases', 'schema', 'builder', 'unified', 'tester', 'docs', 'analytics', 'settings'].includes(hash)) {
         setCurrentView(hash as ViewType);
+        // Update URL hash to reflect current view
+        window.history.replaceState(null, '', `#${hash}`);
       }
     };
 
-    // Load on mount
-    handleHashChange();
+    // Only load from hash on mount if hash actually exists
+    if (window.location.hash) {
+      handleHashChange();
+    }
     
     // Listen for changes
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Persist current view to localStorage
+  // Persist current view to localStorage and URL hash
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('dashboardView', currentView);
+      // Update URL hash to keep it in sync (replaceState doesn't trigger page reload)
+      window.history.replaceState(null, '', `#${currentView}`);
     }
   }, [currentView]);
 
