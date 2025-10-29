@@ -1,448 +1,284 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Database, Table, Settings, Zap, Trash2, Edit3 } from 'lucide-react';
+import { Database, Play, Save } from 'lucide-react';
 
 interface APIBuilderProps {
-  databases?: any[];
-  onEndpointsChange?: (endpoints: any[]) => void;
+  databases: any[];
 }
 
-export function APIBuilder({ databases = [], onEndpointsChange }: APIBuilderProps) {
-  const [selectedDatabase, setSelectedDatabase] = useState<any>(null);
+export function APIBuilder({ databases }: APIBuilderProps) {
+  const [selectedDb, setSelectedDb] = useState<any>(null);
   const [tables, setTables] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    table: '',
-    method: 'GET',
-    path: '',
-    authentication: true,
-    filters: [] as any[]
-  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (databases.length > 0 && !selectedDatabase) {
-      setSelectedDatabase(databases[0]);
+    if (selectedDb) {
+      loadTables();
     }
-  }, [databases]);
+  }, [selectedDb]);
 
-  useEffect(() => {
-    const loadTables = async () => {
-      if (!selectedDatabase) return;
-      
-      // Use server actions to get tables
-      try {
-        const { introspectDatabaseAction, connectToDatabaseAction } = await import('../actions/databaseActions');
-        
-        const sanitizeForServer = (obj: any) => {
-          if (!obj || typeof obj !== 'object') return obj;
-          const out: any = Array.isArray(obj) ? [] : {};
-          for (const [k, v] of Object.entries(obj)) {
-            if (v && typeof v === 'object') {
-              if (typeof (v as any).seconds === 'number' && typeof (v as any).nanoseconds === 'number') {
-                const millis = (v as any).seconds * 1000 + Math.floor((v as any).nanoseconds / 1e6);
-                out[k] = new Date(millis).toISOString();
-                continue;
-              }
-              if (v instanceof Date || typeof (v as any).toDate === 'function' || typeof (v as any).toJSON === 'function') {
-                try {
-                  const asDate = v instanceof Date ? v : (typeof (v as any).toDate === 'function' ? (v as any).toDate() : new Date((v as any).toString()));
-                  out[k] = new Date(asDate).toISOString();
-                  continue;
-                } catch {}
-              }
-              out[k] = sanitizeForServer(v);
-            } else {
-              out[k] = v;
-            }
-          }
-          return out;
-        };
-        const safeDb = sanitizeForServer(selectedDatabase);
-        
-        // Connect to database using server action
-        await connectToDatabaseAction(safeDb as any);
-        
-        // Introspect database schema via server action
-        const result = await introspectDatabaseAction(safeDb as any);
-        if (result.success && result.tables) {
-          setTables(result.tables);
-          console.log('API Builder loaded tables:', result.tables.map(t => t?.name));
-        } else {
-          console.error('Failed to load tables:', result.error);
-          setTables([]);
-        }
-      } catch (error) {
-        console.error('Failed to load tables:', error);
-        setTables([]);
-      }
-    };
+  const loadTables = async () => {
+    if (!selectedDb) return;
     
-    loadTables();
-  }, [selectedDatabase]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedDatabase) {
-      alert('Please select a database');
-      return;
-    }
-
+    setLoading(true);
     try {
-      // Save endpoint to Firestore
-      const { FirebaseService } = await import('../services/firebaseService');
-      const firebaseService = FirebaseService.getInstance();
+      let res;
       
-      const endpointConfig = {
-        name: formData.name,
-        path: formData.path,
-        method: formData.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
-        tableName: formData.table,
-        connectionId: selectedDatabase.id,
-        authRequired: formData.authentication,
-        filters: formData.filters,
-        rateLimit: 100,
-        isActive: true
-      };
-
-      const savedEndpoint = await firebaseService.saveEndpoint(endpointConfig);
-      
-      // Update local state
-      const updatedEndpoints = [...endpoints, savedEndpoint];
-      setEndpoints(updatedEndpoints);
-      
-      if (onEndpointsChange) {
-        onEndpointsChange(updatedEndpoints);
+      if (selectedDb.type === 'sqlite') {
+        res = await fetch('/api/sqlite/introspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath: selectedDb.filePath })
+        });
+      } else if (selectedDb.type === 'mysql') {
+        res = await fetch('/api/mysql/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+        });
+      } else {
+        alert('Database type not yet supported');
+        return;
       }
 
-      setShowAddForm(false);
-      setFormData({
-        name: '',
-        table: '',
+      if (!res.ok) throw new Error('Failed to load tables');
+
+      const data = await res.json();
+      const tablesList = data.tables || [];
+      
+      let formattedTables;
+      if (selectedDb.type === 'mysql') {
+        formattedTables = tablesList.map((tableName: string) => ({
+          name: tableName,
+          columns: data.schema[tableName] || []
+        }));
+      } else {
+        formattedTables = tablesList;
+      }
+      
+      setTables(formattedTables);
+      generateAvailableEndpoints(formattedTables);
+    } catch (error) {
+      console.error('Failed to load tables:', error);
+      setTables([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateAvailableEndpoints = (tablesList: any[]) => {
+    const allEndpoints: any[] = [];
+    
+    tablesList.forEach(table => {
+      // GET all
+      allEndpoints.push({
+        id: `${selectedDb.id}-${table.name}-list`,
+        table: table.name,
         method: 'GET',
-        path: '',
-        authentication: true,
-        filters: []
+        path: `/api/data/${table.name}`,
+        description: `Get all records from ${table.name}`,
+        collection: table.name,
+        idType: 'users-list'
       });
       
-      alert('API Endpoint created successfully! You can now test it in the API Tester.');
-    } catch (error) {
-      console.error('Failed to save endpoint:', error);
-      alert('Failed to create endpoint: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    const updatedEndpoints = endpoints.filter(ep => ep.id !== id);
-    setEndpoints(updatedEndpoints);
+      // POST create
+      allEndpoints.push({
+        id: `${selectedDb.id}-${table.name}-create`,
+        table: table.name,
+        method: 'POST',
+        path: `/api/data/${table.name}`,
+        description: `Create a new record in ${table.name}`,
+        collection: table.name,
+        idType: 'users-create'
+      });
+      
+      // GET single
+      allEndpoints.push({
+        id: `${selectedDb.id}-${table.name}-read`,
+        table: table.name,
+        method: 'GET',
+        path: `/api/data/${table.name}/:id`,
+        description: `Get a single record from ${table.name}`,
+        collection: table.name,
+        idType: 'users-read'
+      });
+      
+      // PUT update
+      allEndpoints.push({
+        id: `${selectedDb.id}-${table.name}-update`,
+        table: table.name,
+        method: 'PUT',
+        path: `/api/data/${table.name}/:id`,
+        description: `Update a record in ${table.name}`,
+        collection: table.name,
+        idType: 'users-update'
+      });
+      
+      // DELETE
+      allEndpoints.push({
+        id: `${selectedDb.id}-${table.name}-delete`,
+        table: table.name,
+        method: 'DELETE',
+        path: `/api/data/${table.name}/:id`,
+        description: `Delete a record from ${table.name}`,
+        collection: table.name,
+        idType: 'users-delete'
+      });
+    });
     
-    if (onEndpointsChange) {
-      onEndpointsChange(updatedEndpoints);
+    setEndpoints(allEndpoints);
+  };
+
+  const saveEndpoint = (endpoint: any) => {
+    const existing = JSON.parse(localStorage.getItem('saved_endpoints') || '[]');
+    
+    if (existing.some((e: any) => e.id === endpoint.id)) {
+      alert('⚠️ This endpoint is already saved!');
+      return;
     }
-  };
-
-  const addFilter = () => {
-    setFormData(prev => ({
-      ...prev,
-      filters: [...prev.filters, { field: '', operator: 'equals', value: '' }]
-    }));
-  };
-
-  const removeFilter = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      filters: prev.filters.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateFilter = (index: number, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      filters: prev.filters.map((filter, i) => 
-        i === index ? { ...filter, [field]: value } : filter
-      )
-    }));
+    
+    const endpointToSave = {
+      ...endpoint,
+      name: `${endpoint.method} ${endpoint.path}`,
+      database: selectedDb.id,
+      dbType: selectedDb.type,
+      connectionInfo: selectedDb.type === 'sqlite' 
+        ? { filePath: selectedDb.filePath } 
+        : { connectionString: selectedDb.connectionString },
+      createdAt: new Date().toISOString()
+    };
+    
+    existing.push(endpointToSave);
+    localStorage.setItem('saved_endpoints', JSON.stringify(existing));
+    
+    alert(`✅ Endpoint saved!\n\n${endpoint.method} ${endpoint.path}`);
   };
 
   if (databases.length === 0) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">API Builder</h1>
-          <p className="text-gray-600">Build REST APIs from your database tables</p>
-        </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-          <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Databases Connected</h3>
-          <p className="text-gray-600">Connect a database first to start building APIs</p>
-        </div>
+      <div className="text-center py-12 bg-white rounded-lg border">
+        <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No databases connected</h3>
+        <p className="text-gray-600">Connect a database first to generate API endpoints</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">API Builder</h1>
-          <p className="text-gray-600">Build REST APIs from your database tables</p>
-        </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Endpoint</span>
-        </button>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">🔧 Endpoint Builder</h1>
+        <p className="text-gray-600 mt-1">Generate REST API endpoints from your database tables</p>
       </div>
 
-      {/* Database Selector */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Select Database
-        </label>
-        <select
-          value={selectedDatabase?.id || ''}
-          onChange={(e) => {
-            const db = databases.find(d => d.id === e.target.value);
-            setSelectedDatabase(db);
-          }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
+      {/* Select Database */}
+      <div className="bg-white rounded-lg border p-6">
+        <h2 className="text-lg font-semibold mb-4">Select Database</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {databases.map(db => (
-            <option key={db.id} value={db.id}>{db.name}</option>
+            <button
+              key={db.id}
+              onClick={() => setSelectedDb(db)}
+              className={`p-4 border-2 rounded-lg text-left transition-all ${
+                selectedDb?.id === db.id
+                  ? 'border-blue-600 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Database className="w-6 h-6 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold">{db.name}</h3>
+                  <p className="text-sm text-gray-600 capitalize">{db.type}</p>
+                </div>
+              </div>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
-      {/* Add Endpoint Form */}
-      {showAddForm && (
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold mb-4">Create New API Endpoint</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Endpoint Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Get Users"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  HTTP Method
-                </label>
-                <select
-                  value={formData.method}
-                  onChange={(e) => setFormData(prev => ({ ...prev, method: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
-              </div>
+      {/* Available Endpoints */}
+      {selectedDb && (
+        <div className="bg-white rounded-lg border p-6">
+          <h2 className="text-lg font-semibold mb-4">Available Endpoints</h2>
+          
+          {loading ? (
+            <p className="text-gray-600">Loading tables...</p>
+          ) : tables.length === 0 ? (
+            <p className="text-gray-600">No tables found in this database</p>
+          ) : (
+            <div className="space-y-6">
+              {tables.map(table => {
+                const tableEndpoints = endpoints.filter(ep => ep.table === table.name);
+                
+                return (
+                  <div key={table.name} className="border rounded-lg p-4">
+                    {/* Table Header */}
+                    <div className="mb-4 pb-3 border-b">
+                      <h3 className="text-lg font-semibold text-gray-900">/{table.name}</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {table.columns?.length || 0} columns • {tableEndpoints.length} endpoints
+                      </p>
+                    </div>
+                    
+                    {/* Endpoints for this table */}
+                    <div className="space-y-3">
+                      {tableEndpoints.map(endpoint => (
+                        <div key={endpoint.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-1">
+                                <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                  endpoint.method === 'GET' ? 'bg-green-100 text-green-800' :
+                                  endpoint.method === 'POST' ? 'bg-blue-100 text-blue-800' :
+                                  endpoint.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {endpoint.method}
+                                </span>
+                                <code className="text-sm font-mono text-gray-700">{endpoint.path}</code>
+                              </div>
+                              <p className="text-sm text-gray-600">{endpoint.description}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Collection: {endpoint.collection} • ID: {endpoint.idType}
+                              </p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 ml-4">
+                              <button
+                                onClick={() => {
+                                  localStorage.setItem('tester_prefill', JSON.stringify({
+                                    url: `${window.location.origin}${endpoint.path}`,
+                                    method: endpoint.method,
+                                    endpointId: endpoint.id
+                                  }));
+                                  localStorage.setItem('dashboardView', 'tester');
+                                  window.location.reload();
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                <Play className="w-4 h-4" />
+                                Test
+                              </button>
+                              <button
+                                onClick={() => saveEndpoint(endpoint)}
+                                className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                              >
+                                <Save className="w-4 h-4" />
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Database Table
-                </label>
-                <select
-                  value={formData.table}
-                  onChange={(e) => setFormData(prev => ({ ...prev, table: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                >
-                  <option value="">Select a table</option>
-                  {tables.map(table => (
-                    <option key={table.id} value={table.name}>{table.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  API Path
-                </label>
-                <input
-                  type="text"
-                  value={formData.path}
-                  onChange={(e) => setFormData(prev => ({ ...prev, path: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="/api/users"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.authentication}
-                  onChange={(e) => setFormData(prev => ({ ...prev, authentication: e.target.checked }))}
-                  className="mr-2"
-                />
-                <span className="text-sm font-medium text-gray-700">Require Authentication</span>
-              </label>
-            </div>
-
-            {/* Filters Section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Filters (Optional)
-                </label>
-                <button
-                  type="button"
-                  onClick={addFilter}
-                  className="text-blue-600 hover:text-blue-700 text-sm"
-                >
-                  + Add Filter
-                </button>
-              </div>
-              {formData.filters.map((filter, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    placeholder="Field name"
-                    value={filter.field}
-                    onChange={(e) => updateFilter(index, 'field', e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <select
-                    value={filter.operator}
-                    onChange={(e) => updateFilter(index, 'operator', e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="equals">equals</option>
-                    <option value="contains">contains</option>
-                    <option value="greater_than">greater than</option>
-                    <option value="less_than">less than</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeFilter(index)}
-                    className="p-2 text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Create Endpoint
-              </button>
-            </div>
-          </form>
+          )}
         </div>
       )}
-
-      {/* Endpoints List */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">API Endpoints ({endpoints.length})</h2>
-        
-        {endpoints.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <Zap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No API Endpoints</h3>
-            <p className="text-gray-600 mb-4">Create your first API endpoint to get started</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Create Endpoint
-            </button>
-          </div>
-        ) : (
-          endpoints.map(endpoint => (
-            <div key={endpoint.id} className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <span className={`px-3 py-1 text-sm font-medium rounded ${
-                    endpoint.method === 'GET' ? 'bg-green-100 text-green-800' :
-                    endpoint.method === 'POST' ? 'bg-blue-100 text-blue-800' :
-                    endpoint.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {endpoint.method}
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{endpoint.name}</h3>
-                    <code className="text-sm text-gray-600">{endpoint.path}</code>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button className="p-2 text-gray-400 hover:text-gray-600 rounded transition-colors">
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(endpoint.id)}
-                    className="p-2 text-red-400 hover:text-red-600 rounded transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="mt-4 flex items-center space-x-4 text-sm text-gray-600">
-                <div className="flex items-center space-x-1">
-                  <Table className="w-4 h-4" />
-                  <span>Table: {endpoint.table}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Database className="w-4 h-4" />
-                  <span>Database: {endpoint.database}</span>
-                </div>
-                {endpoint.authentication && (
-                  <div className="flex items-center space-x-1">
-                    <Settings className="w-4 h-4" />
-                    <span>Auth Required</span>
-                  </div>
-                )}
-              </div>
-              
-              {endpoint.filters && endpoint.filters.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-sm text-gray-600">Filters:</p>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {endpoint.filters.map((filter: any, index: number) => (
-                      <span
-                        key={index}
-                        className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
-                      >
-                        {filter.field} {filter.operator}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }

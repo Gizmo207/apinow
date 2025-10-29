@@ -21,8 +21,13 @@ export function BillingTab({ user }: BillingTabProps) {
 
   const loadUserPlan = async () => {
     try {
-      const { auth } = await import('../services/firebaseService');
-      const currentUser = auth.currentUser;
+      const stored = localStorage.getItem('auth_user');
+      if (!stored) return;
+      const userData = JSON.parse(stored);
+      const currentUser = {
+        ...userData,
+        getIdToken: async () => `dev-${userData.uid}`
+      };
       if (!currentUser) return;
 
       const token = await currentUser.getIdToken();
@@ -47,8 +52,13 @@ export function BillingTab({ user }: BillingTabProps) {
   const handleCheckout = async (priceId: string) => {
     setLoading(true);
     try {
-      const { auth } = await import('../services/firebaseService');
-      const currentUser = auth.currentUser;
+      const stored = localStorage.getItem('auth_user');
+      if (!stored) return;
+      const userData = JSON.parse(stored);
+      const currentUser = {
+        ...userData,
+        getIdToken: async () => `dev-${userData.uid}`
+      };
       if (!currentUser) return;
 
       const token = await currentUser.getIdToken();

@@ -1,16 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import {
-  User,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail
-} from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebaseConfig';
+
+interface User {
+  uid: string;
+  email: string | null;
+  displayName?: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -36,37 +32,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return unsubscribe;
+    // Check for stored user in localStorage
+    const storedUser = localStorage.getItem('auth_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setLoading(false);
   }, []);
 
   const signup = async (email: string, password: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    
-    // Create user document in Firestore (triggers welcome email)
-    await setDoc(doc(db, 'users', user.uid), {
-      email: user.email,
-      displayName: user.displayName || email.split('@')[0],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    // Simple mock signup - store in localStorage
+    const newUser: User = {
+      uid: Math.random().toString(36).substr(2, 9),
+      email,
+      displayName: email.split('@')[0]
+    };
+    localStorage.setItem('auth_user', JSON.stringify(newUser));
+    setUser(newUser);
   };
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    // Simple mock login - store in localStorage
+    const newUser: User = {
+      uid: Math.random().toString(36).substr(2, 9),
+      email,
+      displayName: email.split('@')[0]
+    };
+    localStorage.setItem('auth_user', JSON.stringify(newUser));
+    setUser(newUser);
   };
 
   const logout = async () => {
-    await signOut(auth);
+    localStorage.removeItem('auth_user');
+    setUser(null);
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    // Mock password reset
+    console.log('Password reset requested for:', email);
   };
 
   const value = {

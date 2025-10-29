@@ -4,18 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { FirebaseService } from '@/services/firebaseService';
 import { Dashboard } from '@/components/Dashboard';
 import { DatabaseConnector } from '@/components/DatabaseConnector';
 import { SchemaExplorer } from '@/components/SchemaExplorer';
 import { MyAPIs } from '@/components/MyAPIs';
-import { UnifiedAPIBuilder } from '@/components/UnifiedAPIBuilder';
+import { APIBuilder } from '@/components/APIBuilder';
 import { APITester } from '@/components/APITester';
 import { Documentation } from '@/components/Documentation';
 import { Analytics } from '@/components/Analytics';
 import { Settings } from '@/components/Settings';
+import { Key, Copy, Check, Trash2 } from 'lucide-react';
 
-type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'unified' | 'tester' | 'docs' | 'analytics' | 'settings';
+type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'endpoints' | 'api-keys' | 'tester' | 'docs' | 'analytics' | 'settings';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -30,37 +30,24 @@ export default function DashboardPage() {
   const [databases, setDatabases] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showKeyForm, setShowKeyForm] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [selectedEndpoints, setSelectedEndpoints] = useState<string[]>([]);
+  const [testingKey, setTestingKey] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{keyId: string, success: boolean, message: string} | null>(null);
+  const [testerKey, setTesterKey] = useState(0);
 
-  // Read view from URL query params (for Stripe redirects)
+  // Read view from URL query params
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const viewParam = params.get('view');
-      if (viewParam && ['dashboard', 'databases', 'schema', 'builder', 'unified', 'tester', 'docs', 'analytics', 'settings'].includes(viewParam)) {
+      if (viewParam && ['dashboard', 'databases', 'schema', 'builder', 'endpoints', 'api-keys', 'tester', 'docs', 'analytics', 'settings'].includes(viewParam)) {
         setCurrentView(viewParam as ViewType);
       }
     }
-  }, []);
-
-  // Listen for hash changes to support navigation from other components
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.substring(1).split('?')[0];
-      if (hash && ['dashboard', 'databases', 'schema', 'builder', 'unified', 'tester', 'docs', 'analytics', 'settings'].includes(hash)) {
-        setCurrentView(hash as ViewType);
-        // Update URL hash to reflect current view
-        window.history.replaceState(null, '', `#${hash}`);
-      }
-    };
-
-    // Only load from hash on mount if hash actually exists
-    if (window.location.hash) {
-      handleHashChange();
-    }
-    
-    // Listen for changes
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   // Persist current view to localStorage and URL hash
@@ -78,122 +65,44 @@ export default function DashboardPage() {
       return;
     }
 
-    const loadUserData = async () => {
-      const firebaseService = FirebaseService.getInstance();
-      
-      try {
-        const connections = await firebaseService.getConnections();
-        const formattedDatabases = connections.map(conn => ({
-          id: conn.id,
-          name: conn.name,
-          type: conn.type,
-          host: conn.host,
-          port: conn.port,
-          database: conn.databaseName,
-          username: conn.username,
-          password: conn.encryptedPassword,
-          projectId: conn.projectId,
-          apiKey: conn.apiKey,
-          authDomain: conn.authDomain,
-          serviceAccountKey: conn.serviceAccountKey,
-          adminApiKey: conn.adminApiKey,
-          adminAuthDomain: conn.adminAuthDomain,
-          databaseURL: conn.databaseURL,
-          storageBucket: conn.storageBucket,
-          supabaseUrl: conn.supabaseUrl,
-          supabaseKey: conn.supabaseKey,
-          connectionString: conn.connectionString,
-          region: conn.region,
-          accessKeyId: conn.accessKeyId,
-          secretAccessKey: conn.secretAccessKey,
-          connected: conn.status === 'connected',
-          createdAt: conn.createdAt
-        }));
-        setDatabases(formattedDatabases);
+    // Load databases from localStorage
+    const stored = localStorage.getItem('sqlite_databases');
+    if (stored) {
+      setDatabases(JSON.parse(stored));
+    }
 
-        const apiEndpoints = await firebaseService.getEndpoints();
-        setEndpoints(apiEndpoints);
+    // Load API keys from localStorage
+    const keysStored = localStorage.getItem('api_keys');
+    if (keysStored) {
+      setApiKeys(JSON.parse(keysStored));
+    }
 
-        try {
-          const subscription = await firebaseService.getUserSubscription();
-          if (!subscription) {
-            await firebaseService.createUserSubscription();
-          }
-        } catch (subscriptionError) {
-          console.log('Failed to load user subscription (non-critical):', subscriptionError);
-        }
-      } catch (error) {
-        console.error('Failed to load user data:', error);
-      }
-    };
-
-    loadUserData();
+    // Load endpoints from localStorage
+    const endpointsStored = localStorage.getItem('saved_endpoints');
+    if (endpointsStored) {
+      setEndpoints(JSON.parse(endpointsStored));
+    }
   }, [user, router]);
 
   const handleAddDatabase = async (db: any) => {
-    const firebaseService = FirebaseService.getInstance();
-    try {
-      await firebaseService.saveConnection(db);
-      const connections = await firebaseService.getConnections();
-      const formatted = connections.map(conn => ({
-        id: conn.id,
-        name: conn.name,
-        type: conn.type,
-        host: conn.host,
-        port: conn.port,
-        database: conn.databaseName,
-        username: conn.username,
-        password: conn.encryptedPassword,
-        projectId: conn.projectId,
-        apiKey: conn.apiKey,
-        authDomain: conn.authDomain,
-        serviceAccountKey: conn.serviceAccountKey,
-        adminApiKey: conn.adminApiKey,
-        adminAuthDomain: conn.adminAuthDomain,
-        databaseURL: conn.databaseURL,
-        storageBucket: conn.storageBucket,
-        supabaseUrl: conn.supabaseUrl,
-        supabaseKey: conn.supabaseKey,
-        connectionString: conn.connectionString,
-        region: conn.region,
-        accessKeyId: conn.accessKeyId,
-        secretAccessKey: conn.secretAccessKey,
-        connected: conn.status === 'connected',
-        createdAt: conn.createdAt
-      }));
-      setDatabases(formatted);
-    } catch (error) {
-      console.error('Failed to add database:', error);
-      throw error;
-    }
+    const newDatabases = [...databases, db];
+    setDatabases(newDatabases);
+    localStorage.setItem('sqlite_databases', JSON.stringify(newDatabases));
   };
 
   const handleDeleteDatabase = async (id: string) => {
-    const firebaseService = FirebaseService.getInstance();
-    try {
-      await firebaseService.deleteConnection(id);
-      setDatabases(prev => prev.filter(db => db.id !== id));
-    } catch (error) {
-      console.error('Failed to delete database:', error);
-      throw error;
-    }
-  };
-
-  const handleTestDatabase = async (db: any) => {
-    // Test connection logic
-    console.log('Testing database connection:', db);
-  };
-
-  const handleEndpointsChange = (newEndpoints: any[]) => {
-    setEndpoints(newEndpoints);
+    const newDatabases = databases.filter(db => db.id !== id);
+    setDatabases(newDatabases);
+    localStorage.setItem('sqlite_databases', JSON.stringify(newDatabases));
   };
 
   const menuItems = [
     { id: 'databases', label: 'Databases', icon: '🗄️' },
     { id: 'schema', label: 'Schema Explorer', icon: '🔍' },
-    { id: 'builder', label: 'My APIs', icon: '📌' },
-    { id: 'unified', label: 'API Explorer', icon: '🔍' },
-    { id: 'tester', label: 'API Tester', icon: '🧪' },
+    { id: 'builder', label: 'Endpoint Builder', icon: '🔧' },
+    { id: 'endpoints', label: 'My Endpoints', icon: '📌' },
+    { id: 'tester', label: 'Endpoint Tester', icon: '🧪' },
+    { id: 'api-keys', label: 'My APIs', icon: '🔑' },
     { id: 'docs', label: 'Documentation', icon: '📄' },
     { id: 'analytics', label: 'Analytics', icon: '📊' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -202,15 +111,342 @@ export default function DashboardPage() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'databases':
-        return <DatabaseConnector databases={databases} onAdd={handleAddDatabase} onDelete={handleDeleteDatabase} onTest={handleTestDatabase} />;
+        return <DatabaseConnector databases={databases} onAdd={handleAddDatabase} onDelete={handleDeleteDatabase} />;
       case 'schema':
-        return <SchemaExplorer databases={databases} currentView={currentView} onViewChange={setCurrentView} endpoints={endpoints} user={user} />;
+        return <SchemaExplorer databases={databases} />;
       case 'builder':
-        return <MyAPIs />;
-      case 'unified':
-        return <UnifiedAPIBuilder databases={databases} />;
+        return <APIBuilder databases={databases} />;
+      case 'endpoints':
+        return <MyAPIs onNavigateToTester={() => {
+          setTesterKey(prev => prev + 1);
+          setCurrentView('tester');
+        }} />;
+      case 'api-keys':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">🔑 My APIs</h1>
+              <p className="text-gray-600 mt-1">Manage authentication keys for your API endpoints</p>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg border p-6">
+                <div className="text-3xl font-bold text-green-600">{apiKeys.filter(k => k.status === 'active').length}</div>
+                <div className="text-sm text-gray-600 mt-1">Active Keys</div>
+              </div>
+              <div className="bg-white rounded-lg border p-6">
+                <div className="text-3xl font-bold text-gray-600">{apiKeys.filter(k => k.status === 'inactive').length}</div>
+                <div className="text-sm text-gray-600 mt-1">Inactive Keys</div>
+              </div>
+              <div className="bg-white rounded-lg border p-6">
+                <div className="text-3xl font-bold text-purple-600">{databases.length}</div>
+                <div className="text-sm text-gray-600 mt-1">Databases</div>
+              </div>
+              <div className="bg-white rounded-lg border p-6">
+                <div className="text-3xl font-bold text-orange-600">{endpoints.length}</div>
+                <div className="text-sm text-gray-600 mt-1">Endpoints</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border">
+              <div className="p-6 border-b">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Your API Keys</h3>
+                  <button
+                    onClick={() => setShowKeyForm(!showKeyForm)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <Key className="w-4 h-4" />
+                    {showKeyForm ? 'Cancel' : 'Generate New Key'}
+                  </button>
+                </div>
+
+                {showKeyForm && (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Key Name</label>
+                      <input
+                        type="text"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                        placeholder="e.g., Production App, Mobile Client"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Allowed Endpoints (optional - leave empty for all)
+                      </label>
+                      <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-3 space-y-2">
+                        {endpoints.length === 0 ? (
+                          <p className="text-sm text-gray-500">No endpoints available. Create some first!</p>
+                        ) : (
+                          endpoints.map((ep) => (
+                            <label key={ep.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedEndpoints.includes(ep.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedEndpoints([...selectedEndpoints, ep.id]);
+                                  } else {
+                                    setSelectedEndpoints(selectedEndpoints.filter(id => id !== ep.id));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 rounded"
+                              />
+                              <span className="text-sm">
+                                <span className="font-medium">{ep.method}</span> {ep.path}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (!newKeyName.trim()) {
+                          alert('Please enter a name for the API key');
+                          return;
+                        }
+
+                        const newKey = 'apinow_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        const newApiKey = {
+                          id: Date.now().toString(),
+                          name: newKeyName,
+                          key: newKey,
+                          status: 'active',
+                          createdAt: new Date().toISOString(),
+                          lastUsed: null,
+                          allowedEndpoints: selectedEndpoints.length > 0 ? selectedEndpoints : null
+                        };
+                        
+                        const stored = localStorage.getItem('api_keys') || '[]';
+                        const keys = JSON.parse(stored);
+                        keys.push(newApiKey);
+                        localStorage.setItem('api_keys', JSON.stringify(keys));
+                        setApiKeys(keys);
+                        
+                        navigator.clipboard.writeText(newKey);
+                        setNewKeyName('');
+                        setSelectedEndpoints([]);
+                        setShowKeyForm(false);
+                      }}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium"
+                    >
+                      Create API Key
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {apiKeys.length === 0 ? (
+                <div className="text-center py-12">
+                  <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No API keys yet</h3>
+                  <p className="text-gray-600">Click "Generate New Key" to create your first API key</p>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {apiKeys.map((key) => (
+                      <div key={key.id} className="border rounded-lg p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-medium text-gray-900">{key.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 text-xs rounded font-medium ${
+                                key.status === 'active' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {key.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const stored = localStorage.getItem('api_keys') || '[]';
+                                  const keys = JSON.parse(stored);
+                                  const updated = keys.map((k: any) => 
+                                    k.id === key.id 
+                                      ? {...k, status: k.status === 'active' ? 'inactive' : 'active'}
+                                      : k
+                                  );
+                                  localStorage.setItem('api_keys', JSON.stringify(updated));
+                                  setApiKeys(updated);
+                                }}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                  key.status === 'active' ? 'bg-green-600' : 'bg-gray-300'
+                                }`}
+                                title={key.status === 'active' ? 'Disable key' : 'Enable key'}
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  key.status === 'active' ? 'translate-x-5' : 'translate-x-0.5'
+                                }`} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <code className="text-sm text-gray-600 bg-gray-100 px-3 py-1.5 rounded font-mono">{key.key}</code>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(key.key);
+                                setCopiedKey(key.key);
+                                setTimeout(() => setCopiedKey(null), 2000);
+                              }}
+                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              {copiedKey === key.key ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setTestingKey(key.id);
+                                setTestResult(null);
+
+                                // Find an endpoint to test with
+                                let testEndpoint;
+                                if (key.allowedEndpoints && key.allowedEndpoints.length > 0) {
+                                  testEndpoint = endpoints.find(ep => key.allowedEndpoints.includes(ep.id));
+                                } else {
+                                  testEndpoint = endpoints.find(ep => ep.method === 'GET');
+                                }
+
+                                if (!testEndpoint) {
+                                  setTestResult({
+                                    keyId: key.id,
+                                    success: false,
+                                    message: 'No endpoints available to test with. Create a GET endpoint first!'
+                                  });
+                                  setTestingKey(null);
+                                  return;
+                                }
+
+                                try {
+                                  const response = await fetch(`${window.location.origin}${testEndpoint.path}`, {
+                                    method: testEndpoint.method,
+                                    headers: {
+                                      'Authorization': `Bearer ${key.key}`,
+                                      'Content-Type': 'application/json'
+                                    }
+                                  });
+
+                                  if (response.ok) {
+                                    setTestResult({
+                                      keyId: key.id,
+                                      success: true,
+                                      message: `✓ Key works! Tested ${testEndpoint.method} ${testEndpoint.path} - Status ${response.status}`
+                                    });
+                                  } else {
+                                    setTestResult({
+                                      keyId: key.id,
+                                      success: false,
+                                      message: `Key test returned status ${response.status}. The key may not have proper access.`
+                                    });
+                                  }
+                                } catch (error: any) {
+                                  setTestResult({
+                                    keyId: key.id,
+                                    success: false,
+                                    message: `Test failed: ${error.message}`
+                                  });
+                                }
+                                setTestingKey(null);
+                              }}
+                              disabled={testingKey === key.id}
+                              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium disabled:opacity-50"
+                              title="Test this API key"
+                            >
+                              {testingKey === key.id ? 'Testing...' : 'Test Key'}
+                            </button>
+                          </div>
+                          <div className="text-xs text-gray-500 space-y-1">
+                            <p>
+                              Created {new Date(key.createdAt).toLocaleDateString()} at {new Date(key.createdAt).toLocaleTimeString()}
+                              {key.lastUsed && ` • Last used ${new Date(key.lastUsed).toLocaleDateString()}`}
+                            </p>
+                            <p>
+                              <span className="font-medium">Access:</span>{' '}
+                              {key.allowedEndpoints ? 
+                                `${key.allowedEndpoints.length} specific endpoint${key.allowedEndpoints.length !== 1 ? 's' : ''}` : 
+                                'All endpoints'
+                              }
+                            </p>
+                          </div>
+
+                          {/* Test Result Display */}
+                          {testResult && testResult.keyId === key.id && (
+                            <div className={`mt-3 p-3 rounded-lg border ${
+                              testResult.success 
+                                ? 'bg-green-50 border-green-200' 
+                                : 'bg-red-50 border-red-200'
+                            }`}>
+                              <div className="flex items-start gap-2">
+                                {testResult.success ? (
+                                  <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                ) : (
+                                  <X className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                )}
+                                <div className="flex-1">
+                                  <p className={`text-sm font-medium ${
+                                    testResult.success ? 'text-green-900' : 'text-red-900'
+                                  }`}>
+                                    {testResult.success ? 'Key Verified ✓' : 'Test Failed'}
+                                  </p>
+                                  <p className={`text-xs mt-1 ${
+                                    testResult.success ? 'text-green-700' : 'text-red-700'
+                                  }`}>
+                                    {testResult.message}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setTestResult(null)}
+                                  className="text-gray-400 hover:text-gray-600"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Revoke "${key.name}"?\n\nThis cannot be undone and any services using this key will stop working.`)) {
+                              const stored = localStorage.getItem('api_keys') || '[]';
+                              const keys = JSON.parse(stored);
+                              const updated = keys.filter((k: any) => k.id !== key.id);
+                              localStorage.setItem('api_keys', JSON.stringify(updated));
+                              setApiKeys(updated);
+                            }
+                          }}
+                          className="ml-4 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Revoke key"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">📘 How to use API Keys</h3>
+              <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                <li>Include your API key in the <code className="bg-blue-100 px-1 rounded">Authorization</code> header</li>
+                <li>Format: <code className="bg-blue-100 px-1 rounded">Authorization: Bearer YOUR_API_KEY</code></li>
+                <li>Test with external tools like <strong>Postman</strong> or <strong>Insomnia</strong></li>
+                <li>Use the "Test Key" button to verify it works with your endpoints</li>
+                <li>Keep your keys secure - don't share them publicly or commit to git</li>
+              </ul>
+            </div>
+          </div>
+        );
       case 'tester':
-        return <APITester />;
+        return <APITester key={testerKey} />;
       case 'docs':
         return <Documentation endpoints={endpoints} />;
       case 'analytics':

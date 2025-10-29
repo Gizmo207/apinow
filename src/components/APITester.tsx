@@ -17,47 +17,52 @@ export function APITester() {
   const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>('');
 
-  // Load saved endpoints
+  // Load saved endpoints on mount
   useEffect(() => {
     loadSavedEndpoints();
   }, []);
 
-  // Parse URL params on mount and listen for hash changes
+  // Load prefill data from localStorage AFTER endpoints are loaded
   useEffect(() => {
-    const loadFromHash = () => {
-      const params = new URLSearchParams(window.location.hash.split('?')[1]);
-      const urlParam = params.get('url');
-      const methodParam = params.get('method');
+    if (savedEndpoints.length === 0) return;
+
+    const prefillData = localStorage.getItem('tester_prefill');
+    if (!prefillData) return;
+
+    try {
+      const { url, method, endpointId } = JSON.parse(prefillData);
       
-      if (urlParam) {
-        setUrl(urlParam);
-        
-        // Auto-select matching endpoint from dropdown
-        const matchingEndpoint = savedEndpoints.find(ep => {
-          const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-          const fullPath = `${origin}${ep.path}`;
-          return fullPath === urlParam && ep.method === (methodParam || method);
-        });
-        
+      console.log('Applying prefill:', { url, method, endpointId });
+      
+      // Auto-fill URL and method
+      if (url) {
+        setUrl(url);
+        console.log('Set URL:', url);
+      }
+      if (method) {
+        setMethod(method);
+        console.log('Set method:', method);
+      }
+      
+      // Auto-select endpoint from dropdown
+      if (endpointId) {
+        const matchingEndpoint = savedEndpoints.find(ep => ep.id === endpointId);
         if (matchingEndpoint) {
-          setSelectedEndpoint(matchingEndpoint.id);
+          setSelectedEndpoint(endpointId);
+          console.log('Selected endpoint:', matchingEndpoint);
         }
       }
-      if (methodParam) {
-        setMethod(methodParam);
-      }
-    };
-
-    loadFromHash();
-    window.addEventListener('hashchange', loadFromHash);
-    return () => window.removeEventListener('hashchange', loadFromHash);
-  }, [savedEndpoints, method]);
+      
+      // Clear the prefill data after applying
+      localStorage.removeItem('tester_prefill');
+    } catch (error) {
+      console.error('Failed to load prefill data:', error);
+    }
+  }, [savedEndpoints]);
 
   const loadSavedEndpoints = async () => {
     try {
-      const { FirebaseService } = await import('../services/firebaseService');
-      const firebaseService = FirebaseService.getInstance();
-      const endpoints = await firebaseService.getEndpoints();
+      const endpoints = JSON.parse(localStorage.getItem('saved_endpoints') || '[]');
       setSavedEndpoints(endpoints);
     } catch (error) {
       console.error('Failed to load endpoints:', error);
@@ -260,7 +265,7 @@ export function APITester() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">API Tester</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Endpoint Tester</h1>
         <p className="text-gray-600">Test your API endpoints with custom requests</p>
       </div>
 

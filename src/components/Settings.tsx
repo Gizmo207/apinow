@@ -1,7 +1,26 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, Key, Shield, Bell, User, Code, Copy, Check, CreditCard } from 'lucide-react';
-import { auth } from '@/services/firebaseService';
 import { BillingTab } from './BillingTab';
+
+// Mock auth for Settings
+const mockAuth = {
+  get currentUser() {
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem('auth_user');
+    if (!stored) return null;
+    const user = JSON.parse(stored);
+    return {
+      ...user,
+      displayName: user.displayName || user.email?.split('@')[0],
+      async getIdToken() {
+        return `dev-${user.uid}`;
+      },
+      async delete() {
+        localStorage.removeItem('auth_user');
+      }
+    };
+  }
+};
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
@@ -70,7 +89,7 @@ export function Settings() {
   // Load user data and notification preferences on mount
   React.useEffect(() => {
     const loadUserData = async () => {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (user) {
         setDisplayName(user.displayName || '');
         setEmail(user.email || '');
@@ -128,7 +147,7 @@ export function Settings() {
   const getMyToken = async () => {
     setGettingToken(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (user) {
         const idToken = await user.getIdToken();
         setToken(idToken);
@@ -149,7 +168,7 @@ export function Settings() {
     setSaveSuccess(false);
     
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) {
         throw new Error('No user logged in');
       }
@@ -184,7 +203,7 @@ export function Settings() {
 
     setDeleting(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) {
         throw new Error('No user logged in');
       }
@@ -213,7 +232,7 @@ export function Settings() {
   const saveSecuritySettings = async () => {
     setSavingSecurity(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.getIdToken();
@@ -246,7 +265,7 @@ export function Settings() {
   const loadApiKeys = React.useCallback(async () => {
     setLoadingKeys(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) {
         console.log('[API Keys] No user logged in');
         return;
@@ -285,7 +304,7 @@ export function Settings() {
   const generateApiKey = async () => {
     setGeneratingKey(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
       const keyName = prompt('Enter a name for this API key (e.g., "Production", "Mobile App"):');
@@ -335,7 +354,7 @@ export function Settings() {
     }
 
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.getIdToken();
@@ -363,7 +382,7 @@ export function Settings() {
   const saveGeneralSettings = async () => {
     setSavingGeneral(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.getIdToken();
@@ -404,7 +423,7 @@ export function Settings() {
     // Auto-save to Firestore
     setSavingNotifications(true);
     try {
-      const user = auth.currentUser;
+      const user = mockAuth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.getIdToken();
@@ -462,7 +481,7 @@ export function Settings() {
         {/* Settings Content */}
         <div className="lg:col-span-3 bg-white rounded-lg border border-gray-200 p-6">
           {activeTab === 'billing' && (
-            <BillingTab user={auth.currentUser} />
+            <BillingTab user={mockAuth.currentUser} />
           )}
 
           {activeTab === 'general' && (

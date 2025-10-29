@@ -1,37 +1,20 @@
-import { auth } from '@/lib/firebaseConfig';
-
 /**
- * Wait for auth to be ready (user loaded or confirmed not logged in)
- */
-function waitForAuth(): Promise<void> {
-  return new Promise((resolve) => {
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      unsubscribe();
-      resolve();
-    });
-  });
-}
-
-/**
- * Get the current user's ID token for API authentication
+ * Get the current user's auth token from localStorage
  * Returns null if user is not authenticated
  */
 export async function getUserAuthToken(): Promise<string | null> {
-  // Wait for auth state to be ready
-  await waitForAuth();
+  if (typeof window === 'undefined') return null;
   
-  const user = auth.currentUser;
+  const storedUser = localStorage.getItem('auth_user');
   
-  if (!user) {
-    console.warn('No user authenticated');
+  if (!storedUser) {
     return null;
   }
 
   try {
-    // Get fresh token (force refresh if older than 5 minutes)
-    const token = await user.getIdToken();
-    console.log('Auth token retrieved successfully');
-    return token;
+    const user = JSON.parse(storedUser);
+    // Return a simple dev token based on user ID
+    return `dev-${user.uid}`;
   } catch (error) {
     console.error('Failed to get auth token:', error);
     return null;
@@ -42,31 +25,16 @@ export async function getUserAuthToken(): Promise<string | null> {
  * Get authorization headers with Bearer token for API requests
  */
 export async function getAuthHeaders(): Promise<HeadersInit> {
-  await waitForAuth();
+  const token = await getUserAuthToken();
   
-  const user = auth.currentUser;
-  
-  if (!user) {
-    console.warn('No authenticated user for auth headers');
+  if (!token) {
     return {
       'Content-Type': 'application/json'
     };
   }
 
-  try {
-    // Try to get real token first
-    const token = await user.getIdToken();
-    console.log('Using real Firebase ID token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-  } catch (error) {
-    console.error('Failed to get ID token, using dev token:', error);
-    // Fallback to dev token
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer dev-${user.uid}`
-    };
-  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
 }
