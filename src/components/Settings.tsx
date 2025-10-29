@@ -55,6 +55,20 @@ export function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
   
+  // Theme and preferences state
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+    }
+    return 'light';
+  });
+  const [timezone, setTimezone] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+    return 'UTC';
+  });
+  
   // Delete account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -411,6 +425,51 @@ export function Settings() {
     } finally {
       setSavingGeneral(false);
     }
+  };
+
+  const handleThemeToggle = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    // Apply theme to document
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  const handleTimezoneChange = (newTimezone: string) => {
+    setTimezone(newTimezone);
+    localStorage.setItem('timezone', newTimezone);
+  };
+
+  const handleExportAllData = () => {
+    // Gather all user data from localStorage
+    const allData = {
+      profile: {
+        displayName,
+        email,
+        theme,
+        timezone,
+      },
+      databases: JSON.parse(localStorage.getItem('sqlite_databases') || '[]'),
+      endpoints: JSON.parse(localStorage.getItem('saved_endpoints') || '[]'),
+      apiKeys: JSON.parse(localStorage.getItem('api_keys') || '[]'),
+      analytics: JSON.parse(localStorage.getItem('api_analytics') || '[]'),
+      exportedAt: new Date().toISOString(),
+    };
+
+    // Create and download JSON file
+    const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `apinow-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const toggleNotification = async (key: keyof typeof notificationPrefs) => {
@@ -937,6 +996,68 @@ export function Settings() {
                       disabled
                     />
                     <p className="text-xs text-gray-500 mt-1">Email changes require re-authentication for security</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">Preferences</h3>
+                  
+                  {/* Theme Toggle */}
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg mb-3">
+                    <div>
+                      <h4 className="font-medium text-gray-900">Theme</h4>
+                      <p className="text-sm text-gray-600">Choose between light and dark mode</p>
+                    </div>
+                    <button 
+                      onClick={handleThemeToggle}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        theme === 'dark' ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  
+                  {/* Timezone Selector */}
+                  <div className="p-4 border border-gray-200 rounded-lg mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Timezone
+                    </label>
+                    <select
+                      value={timezone}
+                      onChange={(e) => handleTimezoneChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="America/New_York">Eastern Time (ET)</option>
+                      <option value="America/Chicago">Central Time (CT)</option>
+                      <option value="America/Denver">Mountain Time (MT)</option>
+                      <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                      <option value="Europe/London">London (GMT)</option>
+                      <option value="Europe/Paris">Central European (CET)</option>
+                      <option value="Asia/Tokyo">Tokyo (JST)</option>
+                      <option value="Asia/Shanghai">Shanghai (CST)</option>
+                      <option value="Australia/Sydney">Sydney (AEDT)</option>
+                      <option value="UTC">UTC</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Used for timestamps in analytics and logs</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-4">Data Management</h3>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <h4 className="font-medium text-gray-900 mb-2">Export All Data</h4>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Download all your data including databases, endpoints, API keys, and analytics in JSON format.
+                    </p>
+                    <button 
+                      onClick={handleExportAllData}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      📥 Export All Data
+                    </button>
                   </div>
                 </div>
 
