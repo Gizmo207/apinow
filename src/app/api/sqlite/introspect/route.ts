@@ -37,33 +37,19 @@ export async function POST(request: NextRequest) {
       ORDER BY name
     `).all();
 
-    const schema = tables.map((table: any) => {
-      const tableName = table.name;
-      
+    const tableNames = tables.map((t: any) => t.name);
+    const schema: any = {};
+    
+    tableNames.forEach((tableName: string) => {
       // Get columns
       const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
       
-      // Get row count
-      const countResult = db.prepare(`SELECT COUNT(*) as count FROM ${tableName}`).get() as any;
-      
-      // Get foreign keys
-      const foreignKeys = db.prepare(`PRAGMA foreign_key_list(${tableName})`).all();
-      const fkMap: Record<string, string> = {};
-      foreignKeys.forEach((fk: any) => {
-        fkMap[fk.from] = `${fk.table}.${fk.to}`;
-      });
-
-      return {
-        name: tableName,
-        rowCount: countResult.count,
-        columns: columns.map((col: any) => ({
-          name: col.name,
-          type: col.type,
-          nullable: col.notnull === 0,
-          primaryKey: col.pk === 1,
-          foreignKey: fkMap[col.name]
-        }))
-      };
+      schema[tableName] = columns.map((col: any) => ({
+        name: col.name,
+        type: col.type,
+        nullable: col.notnull === 0,
+        primaryKey: col.pk === 1
+      }));
     });
 
     db.close();
@@ -73,7 +59,7 @@ export async function POST(request: NextRequest) {
       try { unlinkSync(tempFilePath); } catch {}
     }
 
-    return NextResponse.json({ tables: schema });
+    return NextResponse.json({ tables: tableNames, schema });
   } catch (error) {
     console.error('Introspect error:', error);
     
