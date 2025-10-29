@@ -35,6 +35,11 @@ export function Documentation({ endpoints }: DocumentationProps) {
     markdown += 'Complete documentation for all API endpoints.\n\n';
     markdown += '---\n\n';
 
+    if (!endpoints || endpoints.length === 0) {
+      markdown += 'No endpoints available.\n';
+      return markdown;
+    }
+
     endpoints.forEach(endpoint => {
       markdown += `## ${endpoint.method} ${endpoint.path}\n\n`;
       markdown += `**${endpoint.name}**\n\n`;
@@ -146,11 +151,17 @@ curl -X ${method} "${url}" \\
         {/* Endpoints List */}
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="p-4 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-900">Endpoints ({endpoints.length})</h2>
+            <h2 className="font-semibold text-gray-900">Endpoints ({endpoints?.length || 0})</h2>
           </div>
           <div className="p-4">
-            <div className="space-y-2">
-              {endpoints.map(endpoint => (
+            {(!endpoints || endpoints.length === 0) ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No endpoints available yet.</p>
+                <p className="text-sm mt-2">Create an endpoint in the API Builder to get started!</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {endpoints.map(endpoint => (
                 <button
                   key={endpoint.id}
                   onClick={() => setSelectedEndpoint(endpoint.id)}
@@ -174,7 +185,8 @@ curl -X ${method} "${url}" \\
                   <code className="text-xs text-gray-600">{endpoint.path}</code>
                 </button>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -224,7 +236,7 @@ curl -X ${method} "${url}" \\
               )}
 
               {/* Parameters */}
-              {selectedEndpointData.filters.length > 0 && (
+              {selectedEndpointData.filters && selectedEndpointData.filters.length > 0 && (
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <h3 className="font-semibold text-gray-900 mb-3">Parameters</h3>
                   <div className="overflow-x-auto">
