@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { put } from '@vercel/blob';
 
 export const runtime = 'nodejs';
 
@@ -14,22 +12,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Create uploads directory
-    const uploadsDir = join(process.cwd(), 'uploads');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-
-    // Save file
-    const filename = `${Date.now()}-${file.name}`;
-    const filepath = join(uploadsDir, filename);
+    // Check if we're in development (use local filesystem) or production (use Vercel Blob)
+    const isDev = process.env.NODE_ENV === 'development';
     
-    const bytes = await file.arrayBuffer();
-    await writeFile(filepath, Buffer.from(bytes));
+    if (isDev) {
+      // Development: Save to local filesystem
+      const { writeFile, mkdir } = await import('fs/promises');
+      const { join } = await import('path');
+      const { existsSync } = await import('fs');
+      
+      const uploadsDir = join(process.cwd(), 'uploads');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
 
-    return NextResponse.json({ filePath: filepath, filename });
+      const filename = `${Date.now()}-${file.name}`;
+      const filepath = join(uploadsDir, filename);
+      
+      const bytes = await file.arrayBuffer();
+      await writeFile(filepath, Buffer.from(bytes));
+
+      return NextResponse.json({ filePath: filepath, filename });
+    } else {
+      // Production: Use Vercel Blob
+      const filename = `${Date.now()}-${file.name}`;
+      const blob = await put(filename, file, {
+        access: 'public',
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+
+      return NextResponse.json({ 
+        filePath: blob.url, 
+        filename,
+        blobUrl: blob.url 
+      });
+    }
   } catch (error) {
     console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Upload failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

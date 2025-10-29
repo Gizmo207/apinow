@@ -13,6 +13,7 @@
     "@aws-sdk/lib-dynamodb": "^3.917.0",
     "@getbrevo/brevo": "^3.0.1",
     "@supabase/supabase-js": "^2.76.1",
+    "@vercel/blob": "^2.0.0",
     "better-sqlite3": "^9.2.2",
     "cassandra-driver": "^4.8.0",
     "firebase": "^12.2.1",
