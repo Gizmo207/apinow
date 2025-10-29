@@ -1,9 +1,9 @@
 // Stripe integration for payments
-export async function createCheckoutSession(priceId: string) {
+export async function createCheckoutSession(params: any) {
   const response = await fetch('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ priceId })
+    body: JSON.stringify(params)
   });
   
   if (!response.ok) {
