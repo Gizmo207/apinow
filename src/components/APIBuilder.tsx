@@ -169,6 +169,9 @@ export function APIBuilder({ databases }: APIBuilderProps) {
     existing.push(endpointToSave);
     localStorage.setItem('saved_endpoints', JSON.stringify(existing));
     
+    // Dispatch event to notify dashboard
+    window.dispatchEvent(new Event('endpointsSaved'));
+    
     alert(`✅ Endpoint saved!\n\n${endpoint.method} ${endpoint.path}`);
   };
 

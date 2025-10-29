@@ -78,10 +78,35 @@ export default function DashboardPage() {
     }
 
     // Load endpoints from localStorage
-    const endpointsStored = localStorage.getItem('saved_endpoints');
-    if (endpointsStored) {
-      setEndpoints(JSON.parse(endpointsStored));
-    }
+    const loadEndpoints = () => {
+      const endpointsStored = localStorage.getItem('saved_endpoints');
+      if (endpointsStored) {
+        setEndpoints(JSON.parse(endpointsStored));
+      }
+    };
+    
+    loadEndpoints();
+    
+    // Listen for storage changes (when endpoints are saved)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'saved_endpoints') {
+        loadEndpoints();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom event when saving in same tab
+    const handleEndpointSaved = () => {
+      loadEndpoints();
+    };
+    
+    window.addEventListener('endpointsSaved', handleEndpointSaved);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('endpointsSaved', handleEndpointSaved);
+    };
   }, [user, router]);
 
   const handleAddDatabase = async (db: any) => {

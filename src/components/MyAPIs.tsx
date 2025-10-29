@@ -46,6 +46,7 @@ export function MyAPIs({ onNavigateToTester }: MyAPIsProps = {}) {
       const endpoints = JSON.parse(localStorage.getItem('saved_endpoints') || '[]');
       const updated = endpoints.filter((e: any) => e.id !== id);
       localStorage.setItem('saved_endpoints', JSON.stringify(updated));
+      window.dispatchEvent(new Event('endpointsSaved'));
       setSavedEndpoints(updated);
       showToast('Endpoint deleted successfully', 'success');
     } catch (error) {
@@ -64,6 +65,7 @@ export function MyAPIs({ onNavigateToTester }: MyAPIsProps = {}) {
     setLoading(true);
     try {
       localStorage.setItem('saved_endpoints', '[]');
+      window.dispatchEvent(new Event('endpointsSaved'));
       setSavedEndpoints([]);
       showToast('All endpoints deleted successfully', 'success');
     } catch (error) {
