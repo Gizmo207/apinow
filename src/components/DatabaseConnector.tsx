@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Database, Plus, Upload, Trash2, HelpCircle, Edit2, Save, X } from 'lucide-react';
+import { Database, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { storeSQLiteFile } from '@/lib/sqliteBrowser';
+import { getProviderOptions, getProvider, type Engine } from '@/config/providers';
+import { DynamicProviderForm } from './DynamicProviderForm';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -10,186 +12,20 @@ interface DatabaseConnectorProps {
 
 export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnectorProps) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [category, setCategory] = useState('sql');
-  const [dbType, setDbType] = useState('');
-  const [serviceProvider, setServiceProvider] = useState('');
-  const [name, setName] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [connectionString, setConnectionString] = useState('');
+  const [dbEngine, setDbEngine] = useState<Engine | ''>('');
+  const [providerKey, setProviderKey] = useState('');
+  const [dbName, setDbName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editConnectionString, setEditConnectionString] = useState('');
 
-  const categories = [
-    { value: 'embedded', label: 'Embedded', description: 'File-based databases' },
-    { value: 'sql', label: 'SQL', description: 'Relational databases' },
-    { value: 'nosql', label: 'NoSQL', description: 'Non-relational databases' },
+  // Database engines we currently support
+  const engines: { value: Engine; label: string; description: string }[] = [
+    { value: 'sqlite', label: 'SQLite', description: 'Embedded, browser-based' },
+    { value: 'mysql', label: 'MySQL', description: 'Popular open-source' },
+    { value: 'postgresql', label: 'PostgreSQL', description: 'Advanced features' },
   ];
-
-  const dbTypes: { [key: string]: any[] } = {
-    embedded: [
-      { value: 'sqlite', label: 'SQLite' },
-    ],
-    sql: [
-      { value: 'mysql', label: 'MySQL' },
-      { value: 'postgresql', label: 'PostgreSQL' },
-      { value: 'mssql', label: 'Microsoft SQL Server' },
-      { value: 'mariadb', label: 'MariaDB' },
-    ],
-    nosql: [
-      { value: 'mongodb', label: 'MongoDB' },
-      { value: 'redis', label: 'Redis' },
-      { value: 'cassandra', label: 'Apache Cassandra' },
-      { value: 'dynamodb', label: 'Amazon DynamoDB' },
-    ],
-  };
-
-  const serviceProviders: { [key: string]: any[] } = {
-    sqlite: [
-      { value: 'local', label: 'Local File' },
-    ],
-    mysql: [
-      { value: 'aiven', label: 'Aiven' },
-      { value: 'aws-rds', label: 'AWS RDS' },
-      { value: 'azure-database', label: 'Azure Database for MySQL' },
-      { value: 'clever-cloud', label: 'Clever Cloud' },
-      { value: 'digitalocean', label: 'DigitalOcean Managed Database' },
-      { value: 'fly-io', label: 'Fly.io' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
-      { value: 'planetscale', label: 'PlanetScale' },
-      { value: 'railway', label: 'Railway' },
-      { value: 'render', label: 'Render' },
-      { value: 'scalingo', label: 'Scalingo' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    postgresql: [
-      { value: 'aiven', label: 'Aiven' },
-      { value: 'aws-rds', label: 'AWS RDS' },
-      { value: 'azure-database', label: 'Azure Database for PostgreSQL' },
-      { value: 'crunchy-data', label: 'Crunchy Data' },
-      { value: 'digitalocean', label: 'DigitalOcean Managed Database' },
-      { value: 'elephantsql', label: 'ElephantSQL' },
-      { value: 'fly-io', label: 'Fly.io' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
-      { value: 'heroku', label: 'Heroku Postgres' },
-      { value: 'neon', label: 'Neon' },
-      { value: 'railway', label: 'Railway' },
-      { value: 'render', label: 'Render' },
-      { value: 'supabase', label: 'Supabase' },
-      { value: 'tembo', label: 'Tembo' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    mariadb: [
-      { value: 'aws-rds', label: 'AWS RDS' },
-      { value: 'digitalocean', label: 'DigitalOcean' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
-      { value: 'skysilk', label: 'SkySilk' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    mssql: [
-      { value: 'aws-rds', label: 'AWS RDS for SQL Server' },
-      { value: 'azure-sql', label: 'Azure SQL Database' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    mongodb: [
-      { value: 'atlas', label: 'MongoDB Atlas' },
-      { value: 'aws-documentdb', label: 'AWS DocumentDB' },
-      { value: 'azure-cosmos', label: 'Azure Cosmos DB' },
-      { value: 'digitalocean', label: 'DigitalOcean MongoDB' },
-      { value: 'scalegrid', label: 'ScaleGrid' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    redis: [
-      { value: 'aws-elasticache', label: 'AWS ElastiCache' },
-      { value: 'azure-cache', label: 'Azure Cache for Redis' },
-      { value: 'fly-io', label: 'Fly.io' },
-      { value: 'google-memorystore', label: 'Google Cloud Memorystore' },
-      { value: 'railway', label: 'Railway' },
-      { value: 'redis-cloud', label: 'Redis Cloud' },
-      { value: 'render', label: 'Render' },
-      { value: 'upstash', label: 'Upstash' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    cassandra: [
-      { value: 'aws-keyspaces', label: 'AWS Keyspaces' },
-      { value: 'azure-cosmos', label: 'Azure Cosmos DB' },
-      { value: 'datastax-astra', label: 'DataStax Astra DB' },
-      { value: 'instaclustr', label: 'Instaclustr' },
-      { value: 'other', label: 'Other / Self-Hosted' },
-    ],
-    dynamodb: [
-      { value: 'aws', label: 'AWS DynamoDB' },
-    ],
-  };
-
-  const connectionHelp: { [key: string]: any } = {
-    supabase: {
-      title: 'Finding Supabase Connection String',
-      steps: [
-        '1. Click the "Connect" button at the top of your project dashboard',
-        '2. Or go to Project Settings → Database (gear icon)',
-        '3. At the very top, click the "Connect" button',
-        '4. A modal will pop up with all your connection info',
-        '5. IMPORTANT: Change Method from "Direct connection" to "Session mode" (fixes IPv4 issues)',
-        '6. Select "URI" format',
-        '7. Copy the connection string (should contain "pooler.supabase.com")',
-        '8. Replace [YOUR-PASSWORD] with your actual database password',
-        '9. If you need to reset your password: Project Settings → Database → Database password → Reset',
-      ],
-    },
-    aiven: {
-      title: 'Finding Aiven Connection String',
-      steps: [
-        '1. Go to your service in Aiven Console',
-        '2. Click on "Overview" tab',
-        '3. Scroll to "Connection information"',
-        '4. Copy the "Service URI"',
-        '5. Make sure to include ?ssl-mode=REQUIRED at the end',
-      ],
-    },
-    planetscale: {
-      title: 'Finding PlanetScale Connection String',
-      steps: [
-        '1. Go to your database dashboard',
-        '2. Click "Connect" button',
-        '3. Select "General" or your framework',
-        '4. Copy the connection string shown',
-        '5. Note: Passwords are generated per connection',
-      ],
-    },
-    neon: {
-      title: 'Finding Neon Connection String',
-      steps: [
-        '1. Go to your Neon project dashboard',
-        '2. Click "Connection Details" or the connection icon',
-        '3. Select "Connection string"',
-        '4. Copy the string shown',
-        '5. Connection pooling is enabled by default',
-      ],
-    },
-    railway: {
-      title: 'Finding Railway Connection String',
-      steps: [
-        '1. Go to your project in Railway',
-        '2. Click on your database service',
-        '3. Go to "Connect" tab',
-        '4. Copy the "DATABASE_URL" or "Postgres Connection URL"',
-        '5. The port may vary (not always 3306)',
-      ],
-    },
-    'aws-rds': {
-      title: 'Finding AWS RDS Connection String',
-      steps: [
-        '1. Go to RDS Dashboard in AWS Console',
-        '2. Click on your database instance',
-        '3. Find the "Endpoint" in Connectivity & security',
-        '4. Build connection string: mysql://user:pass@endpoint:3306/dbname',
-        '5. Or postgresql://user:pass@endpoint:5432/dbname',
-      ],
-    },
-  };
 
   const handleEdit = (db: any) => {
     setEditingId(db.id);
@@ -205,11 +41,8 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
         connectionString: editConnectionString,
       };
       
-      // Update in localStorage
       const updatedDatabases = databases.map(d => d.id === db.id ? updatedDb : d);
       localStorage.setItem('sqlite_databases', JSON.stringify(updatedDatabases));
-      
-      // Reload the page to reflect changes
       window.location.reload();
     } catch (error) {
       console.error('Failed to update database:', error);
@@ -223,49 +56,43 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
     setEditConnectionString('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleProviderSubmit = async (values: Record<string, any>) => {
     setUploading(true);
     try {
-      if (dbType === 'sqlite') {
-        // SQLite: Store file in browser IndexedDB
-        if (!file) return;
-        
-        // Store file in browser storage
-        const dbId = await storeSQLiteFile(file);
+      const provider = getProvider(providerKey);
+      if (!provider) throw new Error('Provider not found');
+
+      if (provider.engine === 'sqlite' && values.file) {
+        // SQLite: Store file in browser
+        const dbId = await storeSQLiteFile(values.file);
 
         await onAdd({
           id: dbId,
-          name,
+          name: dbName || values.file.name,
           type: 'sqlite',
           filePath: dbId,
-          fileName: file.name,
+          fileName: values.file.name,
+          provider: provider.name,
+          providerKey,
           createdAt: new Date().toISOString()
         });
-      } else {
+      } else if (values.connectionString) {
         // Other databases: Use connection string
-        if (!connectionString) return;
-        
-        const providerLabel = serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label;
-        
         await onAdd({
           id: Math.random().toString(36).substr(2, 9),
-          name,
-          type: dbType,
-          provider: providerLabel || serviceProvider,
-          connectionString,
+          name: dbName,
+          type: provider.engine,
+          provider: provider.name,
+          providerKey,
+          connectionString: values.connectionString,
           createdAt: new Date().toISOString()
         });
       }
 
       // Reset form
-      setName('');
-      setFile(null);
-      setConnectionString('');
-      setCategory('sql');
-      setDbType('');
-      setServiceProvider('');
+      setDbName('');
+      setDbEngine('');
+      setProviderKey('');
       setShowAddForm(false);
     } catch (error) {
       console.error('Failed to add database:', error);
@@ -293,356 +120,190 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
 
       {showAddForm && (
         <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold mb-4">Connect Database</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 1. Category Dropdown */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Connect Database</h3>
+            <button
+              onClick={() => {
+                setShowAddForm(false);
+                setDbEngine('');
+                setProviderKey('');
+                setDbName('');
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Database Name */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                1. Database Category
-                <span className="ml-2 text-xs text-gray-500 font-normal">What type of database?</span>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Database Name <span className="text-red-600">*</span>
               </label>
-              <select
-                value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
-                  setDbType(''); // Reset type
-                  setServiceProvider(''); // Reset provider
-                }}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {categories.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label} - {cat.description}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="text"
+                value={dbName}
+                onChange={e => setDbName(e.target.value)}
+                placeholder="My Database"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
             </div>
 
-            {/* 2. Database Engine Dropdown */}
+            {/* Engine Selection */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                2. Database Engine
-                <span className="ml-2 text-xs text-gray-500 font-normal">Which database system?</span>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Database Engine <span className="text-red-600">*</span>
               </label>
               <select
-                value={dbType}
-                onChange={(e) => {
-                  setDbType(e.target.value);
-                  setServiceProvider(''); // Reset provider when engine changes
+                value={dbEngine}
+                onChange={e => {
+                  setDbEngine(e.target.value as Engine);
+                  setProviderKey(''); // Reset provider when engine changes
                 }}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               >
                 <option value="">Select database engine...</option>
-                {dbTypes[category]?.map((type: any) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
+                {engines.map(eng => (
+                  <option key={eng.value} value={eng.value}>
+                    {eng.label} - {eng.description}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* 3. Service Provider Dropdown */}
-            {dbType && (
+            {/* Provider Selection */}
+            {dbEngine && (
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  3. Service Provider
-                  <span className="ml-2 text-xs text-gray-500 font-normal">Where is it hosted?</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Provider <span className="text-red-600">*</span>
                 </label>
                 <select
-                  value={serviceProvider}
-                  onChange={(e) => setServiceProvider(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={providerKey}
+                  onChange={e => setProviderKey(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="">Select provider...</option>
-                  {serviceProviders[dbType]?.map((provider) => (
-                    <option key={provider.value} value={provider.value}>
-                      {provider.label}
+                  {getProviderOptions(dbEngine).map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Database Name */}
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <label className="block text-sm font-medium">Database Name</label>
-                <div className="group relative">
-                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-help" />
-                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-80 bg-gray-900 text-white text-xs rounded-lg p-3 z-10">
-                    <p className="font-semibold mb-1">💡 Tip: Finding your database name</p>
-                    <p className="mb-2">The database name is at the <strong>end of your connection string</strong> (after the last <code className="bg-gray-800 px-1 rounded">/</code>)</p>
-                    <p className="text-gray-300">Example:</p>
-                    <code className="block mt-1 text-xs bg-gray-800 p-2 rounded">
-                      postgresql://user:pass@host:5432/<span className="text-yellow-300">postgres</span>
-                    </code>
-                    <p className="mt-2 text-gray-300 italic">Or just give it any friendly name like "Production DB"</p>
-                    <div className="absolute left-4 top-full w-2 h-2 bg-gray-900 transform rotate-45 -mt-1"></div>
-                  </div>
-                </div>
-              </div>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="My Database"
-                required
-              />
-            </div>
-
-            {/* SQLite: File Upload */}
-            {dbType === 'sqlite' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">SQLite File</label>
-                <input
-                  type="file"
-                  accept=".db,.sqlite,.sqlite3"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  required
+            {/* Dynamic Provider Form */}
+            {providerKey && (
+              <div className="pt-4 border-t">
+                <DynamicProviderForm
+                  providerKey={providerKey}
+                  onSubmit={handleProviderSubmit}
+                  onCancel={() => {
+                    setShowAddForm(false);
+                    setDbEngine('');
+                    setProviderKey('');
+                    setDbName('');
+                  }}
                 />
-                {file && <p className="mt-2 text-sm text-green-600">✓ {file.name}</p>}
               </div>
             )}
-
-            {/* Other Databases: Connection String */}
-            {dbType !== 'sqlite' && serviceProvider && (
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <label className="block text-sm font-medium">Connection String</label>
-                  {connectionHelp[serviceProvider] && (
-                    <div className="group relative">
-                      <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-96 bg-gray-900 text-white text-xs rounded-lg p-3 z-10">
-                        <p className="font-semibold mb-2">{connectionHelp[serviceProvider].title}</p>
-                        <div className="space-y-1 mb-3">
-                          {connectionHelp[serviceProvider].steps.map((step: string, idx: number) => (
-                            <p key={idx} className="text-gray-200">• {step.replace(/^\d+\.\s*/, '')}</p>
-                          ))}
-                        </div>
-                        <p className="text-gray-300 mb-1">Expected format:</p>
-                        <code className="block text-xs bg-gray-800 p-2 rounded break-all">
-                          {
-                            serviceProvider === 'aiven' && dbType === 'mysql' ? 'mysql://avnadmin:PASS@mysql-xxx.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED' :
-                            serviceProvider === 'supabase' ? 'postgresql://postgres.xxx:PASS@aws-0-us-east-1.pooler.supabase.com:5432/postgres' :
-                            serviceProvider === 'planetscale' ? 'mysql://username:pscale_pw_PASS@aws.connect.psdb.cloud/database?sslaccept=strict' :
-                            serviceProvider === 'neon' ? 'postgresql://user:PASS@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require' :
-                            serviceProvider === 'railway' && dbType === 'mysql' ? 'mysql://root:PASS@containers-us-west-xxx.railway.app:6969/railway' :
-                            serviceProvider === 'railway' && dbType === 'postgresql' ? 'postgresql://postgres:PASS@containers-us-west-xxx.railway.app:5432/railway' :
-                            serviceProvider === 'aiven' && dbType === 'postgresql' ? 'postgres://avnadmin:PASS@pg-xxx.aivencloud.com:12345/defaultdb?sslmode=require' :
-                            dbType === 'postgresql' ? 'postgresql://user:password@host:5432/database' :
-                            dbType === 'mysql' ? 'mysql://user:password@host:3306/database' :
-                            'Connection string format'
-                          }
-                        </code>
-                        <div className="absolute left-4 top-full w-2 h-2 bg-gray-900 transform rotate-45 -mt-1"></div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={connectionString}
-                  onChange={(e) => setConnectionString(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  placeholder={
-                    // MySQL Providers
-                    serviceProvider === 'aiven' && dbType === 'mysql' ? 'mysql://avnadmin:PASS@mysql-xxx.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED' :
-                    serviceProvider === 'planetscale' ? 'mysql://username:pscale_pw_PASS@aws.connect.psdb.cloud/database?sslaccept=strict' :
-                    serviceProvider === 'aws-rds' && dbType === 'mysql' ? 'mysql://admin:password@database.xxx.us-east-1.rds.amazonaws.com:3306/mydb' :
-                    serviceProvider === 'digitalocean' && dbType === 'mysql' ? 'mysql://doadmin:PASS@db-mysql-nyc-xxx.ondigitalocean.com:25060/defaultdb?ssl-mode=REQUIRED' :
-                    serviceProvider === 'railway' && dbType === 'mysql' ? 'mysql://root:PASS@containers-us-west-xxx.railway.app:6969/railway' :
-                    serviceProvider === 'render' && dbType === 'mysql' ? 'mysql://user:PASS@dpg-xxx-a.oregon-postgres.render.com:3306/database' :
-                    serviceProvider === 'fly-io' && dbType === 'mysql' ? 'mysql://user:PASS@myapp.fly.dev:3306/database' :
-                    serviceProvider === 'google-cloud-sql' && dbType === 'mysql' ? 'mysql://root:PASS@35.xxx.xxx.xxx:3306/database' :
-                    serviceProvider === 'azure-database' && dbType === 'mysql' ? 'mysql://username@servername:PASS@servername.mysql.database.azure.com:3306/database?ssl=true' :
-                    serviceProvider === 'clever-cloud' && dbType === 'mysql' ? 'mysql://user:PASS@mysql-xxx.services.clever-cloud.com:3306/database' :
-                    serviceProvider === 'scalingo' && dbType === 'mysql' ? 'mysql://user:PASS@xxx.mysql.dbs.scalingo.com:30000/database' :
-                    serviceProvider === 'other' && dbType === 'mysql' ? 'mysql://user:password@host:3306/database' :
-                    
-                    // PostgreSQL Providers
-                    serviceProvider === 'supabase' ? 'postgresql://postgres.xxx:PASS@aws-0-us-east-1.pooler.supabase.com:5432/postgres' :
-                    serviceProvider === 'neon' ? 'postgresql://user:PASS@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require' :
-                    serviceProvider === 'aiven' && dbType === 'postgresql' ? 'postgres://avnadmin:PASS@pg-xxx.aivencloud.com:12345/defaultdb?sslmode=require' :
-                    
-                    // MongoDB Providers
-                    serviceProvider === 'atlas' ? 'mongodb+srv://username:PASS@cluster0.xxx.mongodb.net/database?retryWrites=true&w=majority' :
-                    
-                    // Generic fallbacks
-                    dbType === 'postgresql' ? 'postgresql://user:password@localhost:5432/database' :
-                    dbType === 'mysql' ? 'mysql://user:password@localhost:3306/database' :
-                    dbType === 'mongodb' ? 'mongodb://localhost:27017/database' :
-                    dbType === 'redis' ? 'redis://localhost:6379' :
-                    'Enter connection string'
-                  }
-                  required
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  {(dbType === 'mysql' || dbType === 'postgresql') && serviceProvider !== 'other' && `📋 ${serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label} format`}
-                  {(dbType === 'mysql' || dbType === 'postgresql') && serviceProvider === 'other' && `✅ ${dbType === 'mysql' ? 'MySQL' : 'PostgreSQL'} fully supported - use any valid connection string`}
-                  {dbType !== 'mysql' && dbType !== 'postgresql' && serviceProvider !== 'other' && `⚠️ ${serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label} support coming soon`}
-                </p>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={uploading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {uploading ? (dbType === 'sqlite' ? 'Uploading...' : 'Connecting...') : (dbType === 'sqlite' ? 'Upload Database' : 'Connect Database')}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       )}
 
-      <div className="grid gap-4">
-        {databases.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg border">
-            <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No databases connected</h3>
-            <p className="text-gray-600 mb-4">Connect your first database to get started</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-            >
-              Connect Database
-            </button>
-          </div>
-        ) : (
-          databases.map(db => (
-            <div key={db.id} className="bg-white p-6 rounded-lg border">
+      {/* Database List */}
+      {databases.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg border">
+          <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No databases connected</h3>
+          <p className="text-gray-600 mb-4">Click "Connect Database" to get started</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {databases.map((db) => (
+            <div key={db.id} className="bg-white p-4 rounded-lg border hover:shadow-md transition-shadow">
               {editingId === db.id ? (
-                // Edit Mode
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Database Name</label>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="w-full px-2 py-1 border rounded text-sm"
+                    placeholder="Database name"
+                  />
+                  {db.connectionString && (
                     <input
                       type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={editConnectionString}
+                      onChange={e => setEditConnectionString(e.target.value)}
+                      className="w-full px-2 py-1 border rounded text-sm font-mono"
+                      placeholder="Connection string"
                     />
-                  </div>
-                  {db.connectionString && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Connection String</label>
-                      <input
-                        type="text"
-                        value={editConnectionString}
-                        onChange={(e) => setEditConnectionString(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                      />
-                    </div>
                   )}
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => handleSaveEdit(db)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      className="flex-1 bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center justify-center gap-1"
                     >
-                      <Save className="w-4 h-4" />
+                      <Save className="w-3 h-3" />
                       Save
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex-1 bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400 flex items-center justify-center gap-1"
+                    >
+                      <X className="w-3 h-3" />
+                      Cancel
                     </button>
                   </div>
                 </div>
               ) : (
-                // View Mode
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1">
-                    <Database className="w-8 h-8 text-blue-600" />
-                    <div>
-                      <h3 className="text-lg font-semibold">{db.name}</h3>
-                      <p className="text-sm text-gray-600">
-                        {(() => {
-                          // Find the type label across all categories
-                          let foundLabel = db.type.toUpperCase();
-                          for (const category of Object.keys(dbTypes)) {
-                            const type = dbTypes[category].find((t: any) => t.value === db.type);
-                            if (type) {
-                              foundLabel = type.label;
-                              break;
-                            }
-                          }
-                          return foundLabel;
-                        })()} 
-                        {db.fileName && ` • ${db.fileName}`}
-                        {db.provider && ` • ${db.provider}`}
-                      </p>
+                <>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">{db.name}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                          {db.type?.toUpperCase()}
+                        </span>
+                        {db.provider && (
+                          <span className="text-xs text-gray-600">{db.provider}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      {db.connectionString && (
+                        <button
+                          onClick={() => handleEdit(db)}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onDelete(db.id)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {(db.type === 'mysql' || db.type === 'postgresql') && db.connectionString && (
-                      <button
-                    onClick={async () => {
-                      if (!confirm('This will create a "users" table with 3 test users. Continue?')) return;
-                      
-                      setUploading(true);
-                      try {
-                        const res = await fetch(`/api/${db.type}/setup`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ connectionString: db.connectionString })
-                        });
-                        
-                        if (res.ok) {
-                          alert('✅ Test data created! Go to Schema Explorer to see your users table.');
-                        } else {
-                          const error = await res.json();
-                          alert('❌ Error: ' + error.error);
-                        }
-                      } catch (error) {
-                        alert('❌ Failed to setup test data');
-                      } finally {
-                        setUploading(false);
-                      }
-                    }}
-                    disabled={uploading}
-                    className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50"
-                  >
-                    Setup Test Data
-                  </button>
-                    )}
-                    {db.connectionString && (
-                      <button
-                        onClick={() => handleEdit(db)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                        title="Edit database"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onDelete(db.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    {db.fileName && <p>📁 {db.fileName}</p>}
+                    <p>Added {new Date(db.createdAt).toLocaleDateString()}</p>
                   </div>
-                </div>
+                </>
               )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
