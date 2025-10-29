@@ -37,7 +37,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       }
       
       let res;
-      if (selectedDb.type === 'mysql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb') {
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -60,7 +60,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       const tablesList = data.tables || [];
       
       let formattedTables;
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'postgresql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql') {
         formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []

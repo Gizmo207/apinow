@@ -45,7 +45,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       }
       
       let res;
-      if (selectedDb.type === 'mysql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb') {
         console.log('Calling MySQL connect API with:', selectedDb.connectionString);
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
@@ -76,8 +76,8 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       const tablesList = data.tables || [];
       console.log('Tables list:', tablesList);
       
-      // Convert MySQL and PostgreSQL tables to the format expected
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'postgresql') {
+      // Convert MySQL, MariaDB, and PostgreSQL tables to the format expected
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql') {
         const formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []
@@ -108,7 +108,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       }
       
       let res;
-      if (selectedDb.type === 'mysql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb') {
         res = await fetch('/api/mysql/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

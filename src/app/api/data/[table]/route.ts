@@ -99,12 +99,13 @@ export async function GET(
         tempFilePath = null;
       }
     } 
-    else if (dbType === 'mysql') {
+    else if (dbType === 'mysql' || dbType === 'mariadb') {
       if (!connectionString) {
         return NextResponse.json({ error: 'Connection string required' }, { status: 400 });
       }
       
       // Parse connection string and add SSL if needed
+      // MariaDB uses MySQL protocol
       let connectionConfig: any;
       if (connectionString.includes('ssl-mode=REQUIRED') || connectionString.includes('aivencloud.com')) {
         connectionConfig = {

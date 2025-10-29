@@ -24,6 +24,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
   const engines: { value: Engine; label: string; description: string }[] = [
     { value: 'sqlite', label: 'SQLite', description: 'Embedded, browser-based' },
     { value: 'mysql', label: 'MySQL', description: 'Popular open-source' },
+    { value: 'mariadb', label: 'MariaDB', description: 'MySQL-compatible fork' },
     { value: 'postgresql', label: 'PostgreSQL', description: 'Advanced features' },
   ];
 
