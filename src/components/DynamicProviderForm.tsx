@@ -122,6 +122,16 @@ export function DynamicProviderForm({
                 <p className="mt-2 text-sm text-green-600">✓ {values[field.name].name}</p>
               )}
             </>
+          ) : field.type === 'checkbox' ? (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={values[field.name] || false}
+                onChange={e => updateValue(field.name, e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">{field.helpText || 'Enable'}</span>
+            </label>
           ) : field.type === 'password' ? (
             <input
               type="password"

@@ -26,7 +26,9 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
     { value: 'mysql', label: 'MySQL', description: 'Popular open-source' },
     { value: 'mariadb', label: 'MariaDB', description: 'MySQL-compatible fork' },
     { value: 'postgresql', label: 'PostgreSQL', description: 'Advanced features' },
+    { value: 'mssql', label: 'Microsoft SQL Server', description: 'Enterprise database' },
     { value: 'mongodb', label: 'MongoDB', description: 'Document database (NoSQL)' },
+    { value: 'redis', label: 'Redis', description: 'Key-value store (cache)' },
   ];
 
   const handleEdit = (db: any) => {
