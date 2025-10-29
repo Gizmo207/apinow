@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Zap, CheckCircle, XCircle } from 'lucide-react';
 import { getProvider } from '@/config/providers';
 
 interface DynamicProviderFormProps {
@@ -18,6 +18,8 @@ export function DynamicProviderForm({
   const provider = getProvider(providerKey);
   const [values, setValues] = useState<Record<string, any>>(initialValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testing, setTesting] = useState(false);
 
   if (!provider) {
     return <div className="text-red-600">Provider configuration not found</div>;
@@ -75,6 +77,40 @@ export function DynamicProviderForm({
         delete newErrors[fieldName];
         return newErrors;
       });
+    }
+    // Clear test result when values change
+    setTestResult(null);
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      // Apply normalize function if provider has one
+      const normalized = provider.normalize ? provider.normalize(values) : {};
+      const testData = { ...values, ...normalized };
+
+      const response = await fetch('/api/database/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          engine: provider.engine,
+          connectionString: testData.connectionString,
+          providerKey: provider.key,
+        }),
+      });
+
+      const result = await response.json();
+      setTestResult(result);
+    } catch (error: any) {
+      setTestResult({
+        status: 'error',
+        error: error.message,
+        errorType: 'network_error',
+      });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -201,21 +237,74 @@ export function DynamicProviderForm({
         </div>
       )}
 
+      {/* Test Connection Result */}
+      {testResult && (
+        <div className={`rounded-lg border p-4 ${
+          testResult.status === 'ok' 
+            ? 'bg-green-50 border-green-200' 
+            : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-start gap-2">
+            {testResult.status === 'ok' ? (
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            )}
+            <div className="flex-1">
+              <h4 className={`font-semibold ${
+                testResult.status === 'ok' ? 'text-green-900' : 'text-red-900'
+              }`}>
+                {testResult.status === 'ok' ? '✓ Connection Successful' : '✗ Connection Failed'}
+              </h4>
+              <p className={`text-sm mt-1 ${
+                testResult.status === 'ok' ? 'text-green-700' : 'text-red-700'
+              }`}>
+                {testResult.message || testResult.error}
+              </p>
+              {testResult.latency && (
+                <p className="text-xs text-gray-600 mt-1">Latency: {testResult.latency}</p>
+              )}
+              {testResult.suggestions && (
+                <div className="mt-2">
+                  <p className="text-sm font-medium text-red-800">Suggestions:</p>
+                  <ul className="text-sm text-red-700 mt-1 space-y-1">
+                    {testResult.suggestions.map((suggestion: string, i: number) => (
+                      <li key={i}>• {suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex justify-between items-center gap-3 pt-2">
         <button
           type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          onClick={handleTestConnection}
+          disabled={testing}
+          className="px-4 py-2 text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
-          Cancel
+          <Zap className="w-4 h-4" />
+          {testing ? 'Testing...' : 'Test Connection'}
         </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Connect Database
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Connect Database
+          </button>
+        </div>
       </div>
     </form>
   );
