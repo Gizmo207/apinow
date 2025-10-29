@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Activity, Clock, Download, RefreshCw, AlertTriangle, CheckCircle, Key, Zap } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, Clock, Download, RefreshCw, AlertTriangle, CheckCircle, Key } from 'lucide-react';
 import { getAnalyticsSummary, getRealTimeStats, clearAnalytics, exportAnalytics, getEvents } from '@/lib/analytics';
-import { generateDemoAnalytics } from '@/lib/demoAnalytics';
 
 export function Analytics() {
   const [summary, setSummary] = useState(getAnalyticsSummary(7));
@@ -46,13 +45,6 @@ export function Analytics() {
     URL.revokeObjectURL(url);
   };
 
-  const handleGenerateDemo = () => {
-    if (confirm('Generate 50 demo API calls for testing? This will add sample data to your analytics.')) {
-      generateDemoAnalytics(50);
-      loadData();
-    }
-  };
-
   const errorRate = summary.totalCalls > 0
     ? (summary.errorCalls / summary.totalCalls) * 100
     : 0;
@@ -81,16 +73,6 @@ export function Analytics() {
             <option value={14}>Last 14 days</option>
             <option value={30}>Last 30 days</option>
           </select>
-          
-          {summary.totalCalls === 0 && (
-            <button
-              onClick={handleGenerateDemo}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              <Zap className="w-4 h-4" />
-              <span className="hidden sm:inline">Generate Demo Data</span>
-            </button>
-          )}
           
           <button
             onClick={handleExport}
