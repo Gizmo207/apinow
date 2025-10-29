@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Database, Plus, Upload, Trash2, HelpCircle, Edit2, Save, X } from 'lucide-react';
-import { storeSQLiteFile } from '@/lib/sqliteClient';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -27,10 +26,13 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
     { value: 'nosql', label: 'NoSQL', description: 'Non-relational databases' },
   ];
 
+  // SQLite only works on localhost (filesystem required)
+  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  
   const dbTypes: { [key: string]: any[] } = {
-    embedded: [
-      { value: 'sqlite', label: 'SQLite' },
-    ],
+    embedded: isLocalhost ? [
+      { value: 'sqlite', label: 'SQLite (localhost only)' },
+    ] : [],
     sql: [
       { value: 'mysql', label: 'MySQL' },
       { value: 'postgresql', label: 'PostgreSQL' },
@@ -229,17 +231,26 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
     setUploading(true);
     try {
       if (dbType === 'sqlite') {
-        // SQLite: Store file in browser (IndexedDB)
+        // SQLite: Upload file to server (localhost only)
         if (!file) return;
         
-        // Store file in IndexedDB using sql.js
-        const dbId = await storeSQLiteFile(file);
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadRes = await fetch('/api/sqlite/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadRes.ok) throw new Error('Upload failed');
+
+        const { filePath } = await uploadRes.json();
 
         await onAdd({
-          id: dbId,
+          id: Math.random().toString(36).substr(2, 9),
           name,
           type: 'sqlite',
-          filePath: dbId, // Use dbId as filePath for client-side storage
+          filePath,
           fileName: file.name,
           createdAt: new Date().toISOString()
         });

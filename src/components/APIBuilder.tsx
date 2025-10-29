@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Code, Copy, Check, Database, Play } from 'lucide-react';
-import { getSQLiteSchema } from '@/lib/sqliteClient';
 
 interface APIBuilderProps {
   databases: any[];
@@ -23,21 +22,15 @@ export function APIBuilder({ databases }: APIBuilderProps) {
     
     setLoading(true);
     try {
-      if (selectedDb.type === 'sqlite') {
-        // Client-side SQLite
-        const { tables: tablesList, schema } = await getSQLiteSchema(selectedDb.filePath);
-        const formattedTables = tablesList.map((tableName: string) => ({
-          name: tableName,
-          columns: schema[tableName] || []
-        }));
-        setTables(formattedTables);
-        generateAvailableEndpoints(formattedTables);
-        setLoading(false);
-        return;
-      }
-      
       let res;
-      if (selectedDb.type === 'mysql') {
+      
+      if (selectedDb.type === 'sqlite') {
+        res = await fetch('/api/sqlite/introspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath: selectedDb.filePath })
+        });
+      } else if (selectedDb.type === 'mysql') {
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

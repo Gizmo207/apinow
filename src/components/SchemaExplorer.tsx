@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Table, RefreshCw } from 'lucide-react';
-import { getSQLiteSchema, querySQLite } from '@/lib/sqliteClient';
 
 interface SchemaExplorerProps {
   databases: any[];
@@ -32,21 +31,15 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     
     setLoading(true);
     try {
-      if (selectedDb.type === 'sqlite') {
-        // Client-side SQLite: Load from IndexedDB
-        console.log('Loading SQLite schema from IndexedDB');
-        const { tables: tablesList, schema } = await getSQLiteSchema(selectedDb.filePath);
-        const formattedTables = tablesList.map((tableName: string) => ({
-          name: tableName,
-          columns: schema[tableName] || []
-        }));
-        setTables(formattedTables);
-        setLoading(false);
-        return;
-      }
-      
       let res;
-      if (selectedDb.type === 'mysql') {
+      
+      if (selectedDb.type === 'sqlite') {
+        res = await fetch('/api/sqlite/introspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath: selectedDb.filePath })
+        });
+      } else if (selectedDb.type === 'mysql') {
         console.log('Calling MySQL connect API with:', selectedDb.connectionString);
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
@@ -99,17 +92,18 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const loadTableData = async (table: any) => {
     setLoading(true);
     try {
-      if (selectedDb.type === 'sqlite') {
-        // Client-side SQLite: Query from IndexedDB
-        const rows = await querySQLite(selectedDb.filePath, `SELECT * FROM ${table.name} LIMIT 100`);
-        setTableData(rows);
-        setSelectedTable(table);
-        setLoading(false);
-        return;
-      }
-      
       let res;
-      if (selectedDb.type === 'mysql') {
+      
+      if (selectedDb.type === 'sqlite') {
+        res = await fetch('/api/sqlite/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filePath: selectedDb.filePath,
+            query: `SELECT * FROM ${table.name} LIMIT 100`
+          })
+        });
+      } else if (selectedDb.type === 'mysql') {
         res = await fetch('/api/mysql/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
