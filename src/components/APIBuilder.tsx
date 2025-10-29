@@ -146,7 +146,12 @@ export function APIBuilder({ databases }: APIBuilderProps) {
     const endpointToSave = {
       ...endpoint,
       name: `${endpoint.method} ${endpoint.path}`,
-      database: selectedDb.id,
+      database: {
+        id: selectedDb.id,
+        type: selectedDb.type,
+        connectionString: selectedDb.connectionString,
+        filePath: selectedDb.filePath,
+      },
       dbType: selectedDb.type,
       connectionInfo: selectedDb.type === 'sqlite' 
         ? { filePath: selectedDb.filePath } 

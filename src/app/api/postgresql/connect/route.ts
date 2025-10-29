@@ -103,8 +103,16 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('PostgreSQL connection error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to connect to PostgreSQL database' },
+      { 
+        error: error.message || 'Failed to connect to PostgreSQL database',
+        details: error.code || 'Unknown error'
+      },
       { status: 500 }
     );
   }

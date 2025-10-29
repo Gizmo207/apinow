@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Database, Plus, Upload, Trash2, HelpCircle } from 'lucide-react';
+import { Database, Plus, Upload, Trash2, HelpCircle, Edit2, Save, X } from 'lucide-react';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -16,7 +16,9 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
   const [file, setFile] = useState<File | null>(null);
   const [connectionString, setConnectionString] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editConnectionString, setEditConnectionString] = useState('');
 
   const categories = [
     { value: 'embedded', label: 'Embedded', description: 'File-based databases' },
@@ -129,9 +131,11 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
         '2. Or go to Project Settings → Database (gear icon)',
         '3. At the very top, click the "Connect" button',
         '4. A modal will pop up with all your connection info',
-        '5. Select "URI" format (not Session mode)',
-        '6. Copy the connection string',
-        '7. If you need to reset your password: Project Settings → Database → Database password → Reset',
+        '5. IMPORTANT: Change Method from "Direct connection" to "Session mode" (fixes IPv4 issues)',
+        '6. Select "URI" format',
+        '7. Copy the connection string (should contain "pooler.supabase.com")',
+        '8. Replace [YOUR-PASSWORD] with your actual database password',
+        '9. If you need to reset your password: Project Settings → Database → Database password → Reset',
       ],
     },
     aiven: {
@@ -184,6 +188,38 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
         '5. Or postgresql://user:pass@endpoint:5432/dbname',
       ],
     },
+  };
+
+  const handleEdit = (db: any) => {
+    setEditingId(db.id);
+    setEditName(db.name);
+    setEditConnectionString(db.connectionString || '');
+  };
+
+  const handleSaveEdit = async (db: any) => {
+    try {
+      const updatedDb = {
+        ...db,
+        name: editName,
+        connectionString: editConnectionString,
+      };
+      
+      // Update in localStorage
+      const updatedDatabases = databases.map(d => d.id === db.id ? updatedDb : d);
+      localStorage.setItem('sqlite_databases', JSON.stringify(updatedDatabases));
+      
+      // Reload the page to reflect changes
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to update database:', error);
+      alert('Failed to update database');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditConnectionString('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -339,7 +375,22 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
 
             {/* Database Name */}
             <div>
-              <label className="block text-sm font-medium mb-1">Database Name</label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="block text-sm font-medium">Database Name</label>
+                <div className="group relative">
+                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-80 bg-gray-900 text-white text-xs rounded-lg p-3 z-10">
+                    <p className="font-semibold mb-1">💡 Tip: Finding your database name</p>
+                    <p className="mb-2">The database name is at the <strong>end of your connection string</strong> (after the last <code className="bg-gray-800 px-1 rounded">/</code>)</p>
+                    <p className="text-gray-300">Example:</p>
+                    <code className="block mt-1 text-xs bg-gray-800 p-2 rounded">
+                      postgresql://user:pass@host:5432/<span className="text-yellow-300">postgres</span>
+                    </code>
+                    <p className="mt-2 text-gray-300 italic">Or just give it any friendly name like "Production DB"</p>
+                    <div className="absolute left-4 top-full w-2 h-2 bg-gray-900 transform rotate-45 -mt-1"></div>
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 value={name}
@@ -371,14 +422,33 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
                 <div className="flex items-center gap-2 mb-1">
                   <label className="block text-sm font-medium">Connection String</label>
                   {connectionHelp[serviceProvider] && (
-                    <button
-                      type="button"
-                      onClick={() => setShowHelp(true)}
-                      className="text-blue-600 hover:text-blue-700"
-                      title="Help finding connection string"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                    </button>
+                    <div className="group relative">
+                      <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-600 cursor-help" />
+                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-96 bg-gray-900 text-white text-xs rounded-lg p-3 z-10">
+                        <p className="font-semibold mb-2">{connectionHelp[serviceProvider].title}</p>
+                        <div className="space-y-1 mb-3">
+                          {connectionHelp[serviceProvider].steps.map((step: string, idx: number) => (
+                            <p key={idx} className="text-gray-200">• {step.replace(/^\d+\.\s*/, '')}</p>
+                          ))}
+                        </div>
+                        <p className="text-gray-300 mb-1">Expected format:</p>
+                        <code className="block text-xs bg-gray-800 p-2 rounded break-all">
+                          {
+                            serviceProvider === 'aiven' && dbType === 'mysql' ? 'mysql://avnadmin:PASS@mysql-xxx.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED' :
+                            serviceProvider === 'supabase' ? 'postgresql://postgres.xxx:PASS@aws-0-us-east-1.pooler.supabase.com:5432/postgres' :
+                            serviceProvider === 'planetscale' ? 'mysql://username:pscale_pw_PASS@aws.connect.psdb.cloud/database?sslaccept=strict' :
+                            serviceProvider === 'neon' ? 'postgresql://user:PASS@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require' :
+                            serviceProvider === 'railway' && dbType === 'mysql' ? 'mysql://root:PASS@containers-us-west-xxx.railway.app:6969/railway' :
+                            serviceProvider === 'railway' && dbType === 'postgresql' ? 'postgresql://postgres:PASS@containers-us-west-xxx.railway.app:5432/railway' :
+                            serviceProvider === 'aiven' && dbType === 'postgresql' ? 'postgres://avnadmin:PASS@pg-xxx.aivencloud.com:12345/defaultdb?sslmode=require' :
+                            dbType === 'postgresql' ? 'postgresql://user:password@host:5432/database' :
+                            dbType === 'mysql' ? 'mysql://user:password@host:3306/database' :
+                            'Connection string format'
+                          }
+                        </code>
+                        <div className="absolute left-4 top-full w-2 h-2 bg-gray-900 transform rotate-45 -mt-1"></div>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <input
@@ -461,32 +531,75 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
           </div>
         ) : (
           databases.map(db => (
-            <div key={db.id} className="bg-white p-6 rounded-lg border flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
-                <Database className="w-8 h-8 text-blue-600" />
-                <div>
-                  <h3 className="text-lg font-semibold">{db.name}</h3>
-                  <p className="text-sm text-gray-600">
-                    {(() => {
-                      // Find the type label across all categories
-                      let foundLabel = db.type.toUpperCase();
-                      for (const category of Object.keys(dbTypes)) {
-                        const type = dbTypes[category].find((t: any) => t.value === db.type);
-                        if (type) {
-                          foundLabel = type.label;
-                          break;
-                        }
-                      }
-                      return foundLabel;
-                    })()} 
-                    {db.fileName && ` • ${db.fileName}`}
-                    {db.provider && ` • ${db.provider}`}
-                  </p>
+            <div key={db.id} className="bg-white p-6 rounded-lg border">
+              {editingId === db.id ? (
+                // Edit Mode
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Database Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  {db.connectionString && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Connection String</label>
+                      <input
+                        type="text"
+                        value={editConnectionString}
+                        onChange={(e) => setEditConnectionString(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                      />
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveEdit(db)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {(db.type === 'mysql' || db.type === 'postgresql') && db.connectionString && (
-                  <button
+              ) : (
+                // View Mode
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Database className="w-8 h-8 text-blue-600" />
+                    <div>
+                      <h3 className="text-lg font-semibold">{db.name}</h3>
+                      <p className="text-sm text-gray-600">
+                        {(() => {
+                          // Find the type label across all categories
+                          let foundLabel = db.type.toUpperCase();
+                          for (const category of Object.keys(dbTypes)) {
+                            const type = dbTypes[category].find((t: any) => t.value === db.type);
+                            if (type) {
+                              foundLabel = type.label;
+                              break;
+                            }
+                          }
+                          return foundLabel;
+                        })()} 
+                        {db.fileName && ` • ${db.fileName}`}
+                        {db.provider && ` • ${db.provider}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(db.type === 'mysql' || db.type === 'postgresql') && db.connectionString && (
+                      <button
                     onClick={async () => {
                       if (!confirm('This will create a "users" table with 3 test users. Continue?')) return;
                       
@@ -515,81 +628,29 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
                   >
                     Setup Test Data
                   </button>
-                )}
-                <button
-                  onClick={() => onDelete(db.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+                    )}
+                    {db.connectionString && (
+                      <button
+                        onClick={() => handleEdit(db)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        title="Edit database"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onDelete(db.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
       </div>
-
-      {/* Help Modal */}
-      {showHelp && serviceProvider && connectionHelp[serviceProvider] && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <HelpCircle className="w-6 h-6 text-blue-600" />
-                  <h2 className="text-xl font-bold">{connectionHelp[serviceProvider].title}</h2>
-                </div>
-                <button
-                  onClick={() => setShowHelp(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {connectionHelp[serviceProvider].steps.map((step: string, idx: number) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                      {idx + 1}
-                    </div>
-                    <p className="text-gray-700 pt-0.5">{step.replace(/^\d+\.\s*/, '')}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  <strong>Expected format:</strong>
-                </p>
-                <code className="block mt-2 text-xs bg-white p-2 rounded border font-mono text-gray-800">
-                  {
-                    serviceProvider === 'aiven' && dbType === 'mysql' ? 'mysql://avnadmin:PASS@mysql-xxx.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED' :
-                    serviceProvider === 'supabase' ? 'postgresql://postgres:PASS@db.xxx.supabase.co:5432/postgres' :
-                    serviceProvider === 'planetscale' ? 'mysql://username:pscale_pw_PASS@aws.connect.psdb.cloud/database?sslaccept=strict' :
-                    serviceProvider === 'neon' ? 'postgresql://user:PASS@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require' :
-                    serviceProvider === 'railway' && dbType === 'mysql' ? 'mysql://root:PASS@containers-us-west-xxx.railway.app:6969/railway' :
-                    serviceProvider === 'railway' && dbType === 'postgresql' ? 'postgresql://postgres:PASS@containers-us-west-xxx.railway.app:5432/railway' :
-                    dbType === 'postgresql' ? 'postgresql://user:password@host:5432/database' :
-                    dbType === 'mysql' ? 'mysql://user:password@host:3306/database' :
-                    'Connection string format'
-                  }
-                </code>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowHelp(false)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Got it!
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

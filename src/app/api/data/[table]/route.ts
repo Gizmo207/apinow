@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Database from 'better-sqlite3';
+import mysql from 'mysql2/promise';
+import { Client } from 'pg';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -24,6 +26,22 @@ function getLatestDbFile(): string | null {
   return join(uploadsDir, files[files.length - 1]);
 }
 
+// Helper to get database info for a table
+function getDatabaseForTable(table: string): any | null {
+  if (typeof window === 'undefined') {
+    // Server-side - can't access localStorage
+    // We'll need to pass database info via headers
+    return null;
+  }
+  
+  const saved = localStorage.getItem('saved_endpoints');
+  if (!saved) return null;
+  
+  const endpoints = JSON.parse(saved);
+  const endpoint = endpoints.find((ep: any) => ep.table === table);
+  return endpoint ? endpoint.database : null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ table: string }> }
@@ -31,17 +49,87 @@ export async function GET(
   try {
     const { table } = await params;
     
-    const dbPath = getLatestDbFile();
-    if (!dbPath) {
+    // Get database info from headers
+    const dbType = request.headers.get('x-db-type');
+    const connectionString = request.headers.get('x-db-connection');
+    
+    console.log('[API /data GET] Table:', table, 'Type:', dbType);
+    
+    if (!dbType) {
       return NextResponse.json({ 
-        error: 'No database found',
-        details: 'Please upload a SQLite database first'
+        error: 'Database type not specified',
+        details: 'Please specify x-db-type header'
       }, { status: 400 });
     }
     
-    const db = new Database(dbPath, { readonly: true });
-    const rows = db.prepare(`SELECT * FROM ${table}`).all();
-    db.close();
+    let rows: any[] = [];
+    
+    if (dbType === 'sqlite') {
+      const dbPath = getLatestDbFile();
+      if (!dbPath) {
+        return NextResponse.json({ 
+          error: 'No database found',
+          details: 'Please upload a SQLite database first'
+        }, { status: 400 });
+      }
+      
+      const db = new Database(dbPath, { readonly: true });
+      rows = db.prepare(`SELECT * FROM ${table}`).all();
+      db.close();
+    } 
+    else if (dbType === 'mysql') {
+      if (!connectionString) {
+        return NextResponse.json({ error: 'Connection string required' }, { status: 400 });
+      }
+      
+      // Parse connection string and add SSL if needed
+      let connectionConfig: any;
+      if (connectionString.includes('ssl-mode=REQUIRED') || connectionString.includes('aivencloud.com')) {
+        connectionConfig = {
+          uri: connectionString,
+          ssl: {
+            rejectUnauthorized: false
+          }
+        };
+      } else {
+        connectionConfig = connectionString;
+      }
+      
+      const connection = await mysql.createConnection(connectionConfig);
+      const [results] = await connection.execute(`SELECT * FROM ${table}`);
+      rows = results as any[];
+      await connection.end();
+    }
+    else if (dbType === 'postgresql') {
+      if (!connectionString) {
+        return NextResponse.json({ error: 'Connection string required' }, { status: 400 });
+      }
+      
+      // Configure SSL if needed
+      let clientConfig: any;
+      if (connectionString.includes('sslmode=require') || connectionString.includes('ssl=true') || connectionString.includes('pooler.supabase.com')) {
+        clientConfig = {
+          connectionString,
+          ssl: {
+            rejectUnauthorized: false
+          }
+        };
+      } else {
+        clientConfig = { connectionString };
+      }
+      
+      const client = new Client(clientConfig);
+      await client.connect();
+      const result = await client.query(`SELECT * FROM ${table}`);
+      rows = result.rows;
+      await client.end();
+    }
+    else {
+      return NextResponse.json({ 
+        error: 'Unsupported database type',
+        details: `Database type '${dbType}' is not supported`
+      }, { status: 400 });
+    }
     
     return NextResponse.json({ data: rows, count: rows.length });
   } catch (error: any) {

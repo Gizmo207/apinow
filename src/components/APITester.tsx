@@ -135,6 +135,19 @@ export function APITester() {
         debugLog += '❌ Auth NOT added\n';
       }
       
+      // Add database info headers if endpoint has database info
+      const endpointObj = savedEndpoints.find(ep => ep.id === selectedEndpoint);
+      if (endpointObj && endpointObj.database) {
+        console.log('[API Tester] Adding database headers:', endpointObj.database);
+        parsedHeaders['x-db-type'] = endpointObj.database.type;
+        if (endpointObj.database.connectionString) {
+          parsedHeaders['x-db-connection'] = endpointObj.database.connectionString;
+        }
+        if (endpointObj.database.filePath) {
+          parsedHeaders['x-db-file'] = endpointObj.database.filePath;
+        }
+      }
+      
       debugLog += `Final headers: ${JSON.stringify(parsedHeaders, null, 2)}\n`;
       console.log('[API Tester] Final headers to send:', JSON.stringify(parsedHeaders, null, 2));
       
