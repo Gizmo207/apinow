@@ -19,7 +19,7 @@ import { getDatabaseFile } from '@/lib/sqliteBrowser';
 type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'endpoints' | 'api-keys' | 'tester' | 'docs' | 'analytics' | 'settings';
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     if (typeof window !== 'undefined') {
@@ -61,6 +61,9 @@ export default function DashboardPage() {
   }, [currentView]);
 
   useEffect(() => {
+    // Don't redirect while still loading auth state
+    if (loading) return;
+    
     if (!user) {
       router.push('/landing');
       return;
@@ -108,7 +111,7 @@ export default function DashboardPage() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('endpointsSaved', handleEndpointSaved);
     };
-  }, [user, router]);
+  }, [user, loading, router]);
 
   const handleAddDatabase = async (db: any) => {
     const newDatabases = [...databases, db];
@@ -513,6 +516,18 @@ export default function DashboardPage() {
     router.push('/landing');
   };
 
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return null;
   }
@@ -573,6 +588,7 @@ export default function DashboardPage() {
                 key={item.id}
                 onClick={() => {
                   setCurrentView(item.id as ViewType);
+                  localStorage.setItem('dashboardView', item.id);
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
