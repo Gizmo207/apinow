@@ -14,6 +14,7 @@ import { Documentation } from '@/components/Documentation';
 import { Analytics } from '@/components/Analytics';
 import { Settings } from '@/components/Settings';
 import { Key, Copy, Check, Trash2 } from 'lucide-react';
+import { getDatabaseFile } from '@/lib/sqliteBrowser';
 
 type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'endpoints' | 'api-keys' | 'tester' | 'docs' | 'analytics' | 'settings';
 
@@ -350,12 +351,31 @@ export default function DashboardPage() {
                                 }
 
                                 try {
+                                  // Build headers with database info
+                                  const headers: any = {
+                                    'Authorization': `Bearer ${key.key}`,
+                                    'Content-Type': 'application/json'
+                                  };
+                                  
+                                  // Add database headers if endpoint has database info
+                                  if (testEndpoint.database) {
+                                    headers['x-db-type'] = testEndpoint.database.type;
+                                    if (testEndpoint.database.connectionString) {
+                                      headers['x-db-connection'] = testEndpoint.database.connectionString;
+                                    }
+                                    if (testEndpoint.database.filePath && testEndpoint.database.type === 'sqlite') {
+                                      // Get SQLite file data from IndexedDB
+                                      const dbData = await getDatabaseFile(testEndpoint.database.filePath);
+                                      if (dbData) {
+                                        const base64 = btoa(String.fromCharCode(...dbData));
+                                        headers['x-db-file'] = base64;
+                                      }
+                                    }
+                                  }
+                                  
                                   const response = await fetch(`${window.location.origin}${testEndpoint.path}`, {
                                     method: testEndpoint.method,
-                                    headers: {
-                                      'Authorization': `Bearer ${key.key}`,
-                                      'Content-Type': 'application/json'
-                                    }
+                                    headers
                                   });
 
                                   if (response.ok) {

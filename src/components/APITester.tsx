@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Copy, Download, Check } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/clientAuth';
+import { getDatabaseFile } from '@/lib/sqliteBrowser';
 
 export function APITester() {
   const [url, setUrl] = useState('');
@@ -143,8 +144,13 @@ export function APITester() {
         if (endpointObj.database.connectionString) {
           parsedHeaders['x-db-connection'] = endpointObj.database.connectionString;
         }
-        if (endpointObj.database.filePath) {
-          parsedHeaders['x-db-file'] = endpointObj.database.filePath;
+        if (endpointObj.database.filePath && endpointObj.database.type === 'sqlite') {
+          // For SQLite: Get actual file data from IndexedDB and convert to base64
+          const dbData = await getDatabaseFile(endpointObj.database.filePath);
+          if (dbData) {
+            const base64 = btoa(String.fromCharCode(...dbData));
+            parsedHeaders['x-db-file'] = base64;
+          }
         }
       }
       

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import Database from 'better-sqlite3';
 import mysql from 'mysql2/promise';
 import { Client } from 'pg';
-import { readdirSync, existsSync } from 'fs';
+import { readdirSync, existsSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 
 export const runtime = 'nodejs';
 
@@ -46,12 +47,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ table: string }> }
 ) {
+  let tempFilePath: string | null = null;
+  
   try {
     const { table } = await params;
     
     // Get database info from headers
     const dbType = request.headers.get('x-db-type');
     const connectionString = request.headers.get('x-db-connection');
+    const dbFile = request.headers.get('x-db-file');
     
     console.log('[API /data GET] Table:', table, 'Type:', dbType);
     
@@ -65,17 +69,35 @@ export async function GET(
     let rows: any[] = [];
     
     if (dbType === 'sqlite') {
-      const dbPath = getLatestDbFile();
-      if (!dbPath) {
-        return NextResponse.json({ 
-          error: 'No database found',
-          details: 'Please upload a SQLite database first'
-        }, { status: 400 });
+      let dbPath: string;
+      
+      if (dbFile) {
+        // Browser-stored database: decode base64 and write to temp file
+        const buffer = Buffer.from(dbFile, 'base64');
+        tempFilePath = join(tmpdir(), `temp_${Date.now()}.db`);
+        writeFileSync(tempFilePath, buffer);
+        dbPath = tempFilePath;
+      } else {
+        // Fallback: try to find uploaded file (localhost only)
+        const latestFile = getLatestDbFile();
+        if (!latestFile) {
+          return NextResponse.json({ 
+            error: 'No database found',
+            details: 'Please provide database file in x-db-file header'
+          }, { status: 400 });
+        }
+        dbPath = latestFile;
       }
       
       const db = new Database(dbPath, { readonly: true });
       rows = db.prepare(`SELECT * FROM ${table}`).all();
       db.close();
+      
+      // Clean up temp file
+      if (tempFilePath) {
+        try { unlinkSync(tempFilePath); } catch {}
+        tempFilePath = null;
+      }
     } 
     else if (dbType === 'mysql') {
       if (!connectionString) {
@@ -134,6 +156,12 @@ export async function GET(
     return NextResponse.json({ data: rows, count: rows.length });
   } catch (error: any) {
     console.error('[API /data] Error:', error.message);
+    
+    // Clean up temp file on error
+    if (tempFilePath) {
+      try { unlinkSync(tempFilePath); } catch {}
+    }
+    
     return NextResponse.json({ 
       error: 'Database error', 
       details: error.message
