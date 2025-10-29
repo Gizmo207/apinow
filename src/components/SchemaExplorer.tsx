@@ -59,8 +59,16 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connectionString: selectedDb.connectionString })
         });
+      } else if (selectedDb.type === 'mongodb') {
+        console.log('Calling MongoDB connect API with:', selectedDb.connectionString);
+        res = await fetch('/api/mongodb/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+        });
       } else {
-        throw new Error(`Database type ${selectedDb.type} not yet supported`);
+        alert('Database type not yet supported');
+        return;
       }
 
       if (!res.ok) {
@@ -76,8 +84,8 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       const tablesList = data.tables || [];
       console.log('Tables list:', tablesList);
       
-      // Convert MySQL, MariaDB, and PostgreSQL tables to the format expected
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql') {
+      // Convert MySQL, MariaDB, PostgreSQL, and MongoDB tables to the format expected
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb') {
         const formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []
@@ -124,6 +132,17 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           body: JSON.stringify({
             connectionString: selectedDb.connectionString,
             query: `SELECT * FROM ${table.name} LIMIT 100`
+          })
+        });
+      } else if (selectedDb.type === 'mongodb') {
+        res = await fetch('/api/mongodb/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connectionString: selectedDb.connectionString,
+            collection: table.name,
+            operation: 'find',
+            limit: 100
           })
         });
       } else {

@@ -49,6 +49,12 @@ export function APIBuilder({ databases }: APIBuilderProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connectionString: selectedDb.connectionString })
         });
+      } else if (selectedDb.type === 'mongodb') {
+        res = await fetch('/api/mongodb/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+        });
       } else {
         alert('Database type not yet supported');
         return;
@@ -60,7 +66,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       const tablesList = data.tables || [];
       
       let formattedTables;
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb') {
         formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []

@@ -147,6 +147,20 @@ export async function GET(
       rows = result.rows;
       await client.end();
     }
+    else if (dbType === 'mongodb') {
+      if (!connectionString) {
+        return NextResponse.json({ error: 'Connection string required' }, { status: 400 });
+      }
+      
+      // MongoDB query
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(connectionString);
+      await client.connect();
+      const db = client.db();
+      const collection = db.collection(table);
+      rows = await collection.find({}).limit(100).toArray();
+      await client.close();
+    }
     else {
       return NextResponse.json({ 
         error: 'Unsupported database type',
