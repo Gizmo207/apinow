@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Database, Plus, Upload, Trash2 } from 'lucide-react';
+import { Database, Plus, Upload, Trash2, HelpCircle } from 'lucide-react';
 
 interface DatabaseConnectorProps {
   databases: any[];
@@ -16,6 +16,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
   const [file, setFile] = useState<File | null>(null);
   const [connectionString, setConnectionString] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const categories = [
     { value: 'embedded', label: 'Embedded', description: 'File-based databases' },
@@ -47,45 +48,45 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
     ],
     mysql: [
       { value: 'aiven', label: 'Aiven' },
-      { value: 'planetscale', label: 'PlanetScale' },
       { value: 'aws-rds', label: 'AWS RDS' },
-      { value: 'digitalocean', label: 'DigitalOcean Managed Database' },
-      { value: 'railway', label: 'Railway' },
-      { value: 'render', label: 'Render' },
-      { value: 'fly-io', label: 'Fly.io' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
       { value: 'azure-database', label: 'Azure Database for MySQL' },
       { value: 'clever-cloud', label: 'Clever Cloud' },
+      { value: 'digitalocean', label: 'DigitalOcean Managed Database' },
+      { value: 'fly-io', label: 'Fly.io' },
+      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
+      { value: 'planetscale', label: 'PlanetScale' },
+      { value: 'railway', label: 'Railway' },
+      { value: 'render', label: 'Render' },
       { value: 'scalingo', label: 'Scalingo' },
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
     postgresql: [
-      { value: 'supabase', label: 'Supabase' },
-      { value: 'neon', label: 'Neon' },
       { value: 'aiven', label: 'Aiven' },
       { value: 'aws-rds', label: 'AWS RDS' },
+      { value: 'azure-database', label: 'Azure Database for PostgreSQL' },
+      { value: 'crunchy-data', label: 'Crunchy Data' },
+      { value: 'digitalocean', label: 'DigitalOcean Managed Database' },
+      { value: 'elephantsql', label: 'ElephantSQL' },
+      { value: 'fly-io', label: 'Fly.io' },
+      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
+      { value: 'heroku', label: 'Heroku Postgres' },
+      { value: 'neon', label: 'Neon' },
       { value: 'railway', label: 'Railway' },
       { value: 'render', label: 'Render' },
-      { value: 'fly-io', label: 'Fly.io' },
-      { value: 'digitalocean', label: 'DigitalOcean Managed Database' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
-      { value: 'azure-database', label: 'Azure Database for PostgreSQL' },
-      { value: 'heroku', label: 'Heroku Postgres' },
-      { value: 'crunchy-data', label: 'Crunchy Data' },
-      { value: 'elephantsql', label: 'ElephantSQL' },
+      { value: 'supabase', label: 'Supabase' },
       { value: 'tembo', label: 'Tembo' },
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
     mariadb: [
       { value: 'aws-rds', label: 'AWS RDS' },
-      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
       { value: 'digitalocean', label: 'DigitalOcean' },
+      { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
       { value: 'skysilk', label: 'SkySilk' },
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
     mssql: [
-      { value: 'azure-sql', label: 'Azure SQL Database' },
       { value: 'aws-rds', label: 'AWS RDS for SQL Server' },
+      { value: 'azure-sql', label: 'Azure SQL Database' },
       { value: 'google-cloud-sql', label: 'Google Cloud SQL' },
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
@@ -98,26 +99,91 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
     redis: [
-      { value: 'redis-cloud', label: 'Redis Cloud' },
-      { value: 'upstash', label: 'Upstash' },
       { value: 'aws-elasticache', label: 'AWS ElastiCache' },
       { value: 'azure-cache', label: 'Azure Cache for Redis' },
+      { value: 'fly-io', label: 'Fly.io' },
       { value: 'google-memorystore', label: 'Google Cloud Memorystore' },
       { value: 'railway', label: 'Railway' },
+      { value: 'redis-cloud', label: 'Redis Cloud' },
       { value: 'render', label: 'Render' },
-      { value: 'fly-io', label: 'Fly.io' },
+      { value: 'upstash', label: 'Upstash' },
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
     cassandra: [
-      { value: 'datastax-astra', label: 'DataStax Astra DB' },
       { value: 'aws-keyspaces', label: 'AWS Keyspaces' },
       { value: 'azure-cosmos', label: 'Azure Cosmos DB' },
+      { value: 'datastax-astra', label: 'DataStax Astra DB' },
       { value: 'instaclustr', label: 'Instaclustr' },
       { value: 'other', label: 'Other / Self-Hosted' },
     ],
     dynamodb: [
       { value: 'aws', label: 'AWS DynamoDB' },
     ],
+  };
+
+  const connectionHelp: { [key: string]: any } = {
+    supabase: {
+      title: 'Finding Supabase Connection String',
+      steps: [
+        '1. Click the "Connect" button at the top of your project dashboard',
+        '2. Or go to Project Settings → Database (gear icon)',
+        '3. At the very top, click the "Connect" button',
+        '4. A modal will pop up with all your connection info',
+        '5. Select "URI" format (not Session mode)',
+        '6. Copy the connection string',
+        '7. If you need to reset your password: Project Settings → Database → Database password → Reset',
+      ],
+    },
+    aiven: {
+      title: 'Finding Aiven Connection String',
+      steps: [
+        '1. Go to your service in Aiven Console',
+        '2. Click on "Overview" tab',
+        '3. Scroll to "Connection information"',
+        '4. Copy the "Service URI"',
+        '5. Make sure to include ?ssl-mode=REQUIRED at the end',
+      ],
+    },
+    planetscale: {
+      title: 'Finding PlanetScale Connection String',
+      steps: [
+        '1. Go to your database dashboard',
+        '2. Click "Connect" button',
+        '3. Select "General" or your framework',
+        '4. Copy the connection string shown',
+        '5. Note: Passwords are generated per connection',
+      ],
+    },
+    neon: {
+      title: 'Finding Neon Connection String',
+      steps: [
+        '1. Go to your Neon project dashboard',
+        '2. Click "Connection Details" or the connection icon',
+        '3. Select "Connection string"',
+        '4. Copy the string shown',
+        '5. Connection pooling is enabled by default',
+      ],
+    },
+    railway: {
+      title: 'Finding Railway Connection String',
+      steps: [
+        '1. Go to your project in Railway',
+        '2. Click on your database service',
+        '3. Go to "Connect" tab',
+        '4. Copy the "DATABASE_URL" or "Postgres Connection URL"',
+        '5. The port may vary (not always 3306)',
+      ],
+    },
+    'aws-rds': {
+      title: 'Finding AWS RDS Connection String',
+      steps: [
+        '1. Go to RDS Dashboard in AWS Console',
+        '2. Click on your database instance',
+        '3. Find the "Endpoint" in Connectivity & security',
+        '4. Build connection string: mysql://user:pass@endpoint:3306/dbname',
+        '5. Or postgresql://user:pass@endpoint:5432/dbname',
+      ],
+    },
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -302,7 +368,19 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
             {/* Other Databases: Connection String */}
             {dbType !== 'sqlite' && serviceProvider && (
               <div>
-                <label className="block text-sm font-medium mb-1">Connection String</label>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="block text-sm font-medium">Connection String</label>
+                  {connectionHelp[serviceProvider] && (
+                    <button
+                      type="button"
+                      onClick={() => setShowHelp(true)}
+                      className="text-blue-600 hover:text-blue-700"
+                      title="Help finding connection string"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={connectionString}
@@ -341,9 +419,9 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
                   required
                 />
                 <p className="mt-2 text-xs text-gray-500">
-                  {dbType === 'mysql' && serviceProvider !== 'other' && `📋 ${serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label} format`}
-                  {dbType === 'mysql' && serviceProvider === 'other' && '✅ MySQL fully supported - use any valid connection string'}
-                  {dbType !== 'mysql' && serviceProvider !== 'other' && `⚠️ ${serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label} support coming soon`}
+                  {(dbType === 'mysql' || dbType === 'postgresql') && serviceProvider !== 'other' && `📋 ${serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label} format`}
+                  {(dbType === 'mysql' || dbType === 'postgresql') && serviceProvider === 'other' && `✅ ${dbType === 'mysql' ? 'MySQL' : 'PostgreSQL'} fully supported - use any valid connection string`}
+                  {dbType !== 'mysql' && dbType !== 'postgresql' && serviceProvider !== 'other' && `⚠️ ${serviceProviders[dbType]?.find(p => p.value === serviceProvider)?.label} support coming soon`}
                 </p>
               </div>
             )}
@@ -407,14 +485,14 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {db.type === 'mysql' && db.connectionString && (
+                {(db.type === 'mysql' || db.type === 'postgresql') && db.connectionString && (
                   <button
                     onClick={async () => {
                       if (!confirm('This will create a "users" table with 3 test users. Continue?')) return;
                       
                       setUploading(true);
                       try {
-                        const res = await fetch('/api/mysql/setup', {
+                        const res = await fetch(`/api/${db.type}/setup`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ connectionString: db.connectionString })
@@ -449,6 +527,69 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
           ))
         )}
       </div>
+
+      {/* Help Modal */}
+      {showHelp && serviceProvider && connectionHelp[serviceProvider] && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-6 h-6 text-blue-600" />
+                  <h2 className="text-xl font-bold">{connectionHelp[serviceProvider].title}</h2>
+                </div>
+                <button
+                  onClick={() => setShowHelp(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {connectionHelp[serviceProvider].steps.map((step: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
+                      {idx + 1}
+                    </div>
+                    <p className="text-gray-700 pt-0.5">{step.replace(/^\d+\.\s*/, '')}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>Expected format:</strong>
+                </p>
+                <code className="block mt-2 text-xs bg-white p-2 rounded border font-mono text-gray-800">
+                  {
+                    serviceProvider === 'aiven' && dbType === 'mysql' ? 'mysql://avnadmin:PASS@mysql-xxx.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED' :
+                    serviceProvider === 'supabase' ? 'postgresql://postgres:PASS@db.xxx.supabase.co:5432/postgres' :
+                    serviceProvider === 'planetscale' ? 'mysql://username:pscale_pw_PASS@aws.connect.psdb.cloud/database?sslaccept=strict' :
+                    serviceProvider === 'neon' ? 'postgresql://user:PASS@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require' :
+                    serviceProvider === 'railway' && dbType === 'mysql' ? 'mysql://root:PASS@containers-us-west-xxx.railway.app:6969/railway' :
+                    serviceProvider === 'railway' && dbType === 'postgresql' ? 'postgresql://postgres:PASS@containers-us-west-xxx.railway.app:5432/railway' :
+                    dbType === 'postgresql' ? 'postgresql://user:password@host:5432/database' :
+                    dbType === 'mysql' ? 'mysql://user:password@host:3306/database' :
+                    'Connection string format'
+                  }
+                </code>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowHelp(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Got it!
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -47,6 +47,13 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connectionString: selectedDb.connectionString })
         });
+      } else if (selectedDb.type === 'postgresql') {
+        console.log('Calling PostgreSQL connect API with:', selectedDb.connectionString);
+        res = await fetch('/api/postgresql/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+        });
       } else {
         throw new Error(`Database type ${selectedDb.type} not yet supported`);
       }
@@ -64,13 +71,13 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       const tablesList = data.tables || [];
       console.log('Tables list:', tablesList);
       
-      // Convert MySQL tables to the format expected
-      if (selectedDb.type === 'mysql') {
+      // Convert MySQL and PostgreSQL tables to the format expected
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'postgresql') {
         const formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []
         }));
-        console.log('Formatted MySQL tables:', formattedTables);
+        console.log(`Formatted ${selectedDb.type} tables:`, formattedTables);
         setTables(formattedTables);
       } else {
         setTables(tablesList);
@@ -99,6 +106,15 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
         });
       } else if (selectedDb.type === 'mysql') {
         res = await fetch('/api/mysql/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connectionString: selectedDb.connectionString,
+            query: `SELECT * FROM ${table.name} LIMIT 100`
+          })
+        });
+      } else if (selectedDb.type === 'postgresql') {
+        res = await fetch('/api/postgresql/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

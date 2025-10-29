@@ -36,6 +36,12 @@ export function APIBuilder({ databases }: APIBuilderProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connectionString: selectedDb.connectionString })
         });
+      } else if (selectedDb.type === 'postgresql') {
+        res = await fetch('/api/postgresql/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+        });
       } else {
         alert('Database type not yet supported');
         return;
@@ -47,7 +53,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       const tablesList = data.tables || [];
       
       let formattedTables;
-      if (selectedDb.type === 'mysql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'postgresql') {
         formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []
