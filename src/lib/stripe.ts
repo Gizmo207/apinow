@@ -13,7 +13,7 @@ export async function createCheckoutSession(priceId: string) {
   return response.json();
 }
 
-export async function getUserSubscription(userId: string) {
+export async function getUserSubscription(userId?: string) {
   // This would typically fetch from your backend
   return {
     status: 'active',
