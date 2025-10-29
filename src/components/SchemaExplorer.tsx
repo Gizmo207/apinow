@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Table, RefreshCw } from 'lucide-react';
+import { getSQLiteSchema, querySQLite } from '@/lib/sqliteBrowser';
 
 interface SchemaExplorerProps {
   databases: any[];
@@ -31,15 +32,20 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     
     setLoading(true);
     try {
-      let res;
-      
       if (selectedDb.type === 'sqlite') {
-        res = await fetch('/api/sqlite/introspect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filePath: selectedDb.filePath })
-        });
-      } else if (selectedDb.type === 'mysql') {
+        // Use browser-side SQLite
+        const data = await getSQLiteSchema(selectedDb.filePath);
+        const formattedTables = data.tables.map((tableName: string) => ({
+          name: tableName,
+          columns: data.schema[tableName] || []
+        }));
+        setTables(formattedTables);
+        setLoading(false);
+        return;
+      }
+      
+      let res;
+      if (selectedDb.type === 'mysql') {
         console.log('Calling MySQL connect API with:', selectedDb.connectionString);
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
@@ -92,18 +98,17 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const loadTableData = async (table: any) => {
     setLoading(true);
     try {
-      let res;
-      
       if (selectedDb.type === 'sqlite') {
-        res = await fetch('/api/sqlite/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filePath: selectedDb.filePath,
-            query: `SELECT * FROM ${table.name} LIMIT 100`
-          })
-        });
-      } else if (selectedDb.type === 'mysql') {
+        // Use browser-side SQLite
+        const rows = await querySQLite(selectedDb.filePath, `SELECT * FROM ${table.name} LIMIT 100`);
+        setTableData(rows);
+        setSelectedTable(table);
+        setLoading(false);
+        return;
+      }
+      
+      let res;
+      if (selectedDb.type === 'mysql') {
         res = await fetch('/api/mysql/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
