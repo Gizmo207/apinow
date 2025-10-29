@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Code, Copy, Check } from 'lucide-react';
+import { Save, Code, Copy, Check, Database, Play } from 'lucide-react';
 import { getSQLiteSchema } from '@/lib/sqliteClient';
 
 interface APIBuilderProps {

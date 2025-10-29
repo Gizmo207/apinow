@@ -1,3 +1,5 @@
+'use client';
+
 // Client-side SQLite using sql.js (runs in browser)
 import initSqlJs, { Database } from 'sql.js';
 
