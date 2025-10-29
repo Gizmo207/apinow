@@ -14,6 +14,20 @@ export function Analytics() {
   };
 
   useEffect(() => {
+    // CLEAR ANY EXISTING MOCK DATA ON MOUNT
+    const existingData = localStorage.getItem('api_analytics');
+    if (existingData) {
+      const events = JSON.parse(existingData);
+      // Check if data looks like demo data (has xyz789***, abc123***, def456*** keys)
+      const hasDemoKeys = events.some((e: any) => 
+        e.apiKey && (e.apiKey.includes('xyz789') || e.apiKey.includes('abc123') || e.apiKey.includes('def456'))
+      );
+      if (hasDemoKeys) {
+        console.log('Clearing demo data from previous session...');
+        clearAnalytics();
+      }
+    }
+    
     loadData();
     
     // Auto-refresh every 30 seconds
