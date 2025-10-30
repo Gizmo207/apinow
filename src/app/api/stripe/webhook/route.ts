@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { adminDb } from '@/lib/firebase-admin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-09-30.clover',
@@ -30,10 +29,11 @@ export async function POST(request: NextRequest) {
         const email = session.customer_email || session.metadata?.email;
         
         if (email) {
-          // Query Firestore to find user by email
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', email));
-          const querySnapshot = await getDocs(q);
+          // Query Firestore to find user by email using Admin SDK
+          const querySnapshot = await adminDb.collection('users')
+            .where('email', '==', email)
+            .limit(1)
+            .get();
           
           if (!querySnapshot.empty) {
             const userDoc = querySnapshot.docs[0];
@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
               usageLimit = 1000000;
             }
             
-            // Update user document
-            await updateDoc(doc(db, 'users', userDoc.id), {
+            // Update user document using Admin SDK
+            await adminDb.collection('users').doc(userDoc.id).update({
               plan,
               usageLimit,
               stripeCustomerId: session.customer,
@@ -81,14 +81,15 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
         
-        // Find user by subscription ID and downgrade to free
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('stripeSubscriptionId', '==', subscription.id));
-        const querySnapshot = await getDocs(q);
+        // Find user by subscription ID and downgrade to free using Admin SDK
+        const querySnapshot = await adminDb.collection('users')
+          .where('stripeSubscriptionId', '==', subscription.id)
+          .limit(1)
+          .get();
         
         if (!querySnapshot.empty) {
           const userDoc = querySnapshot.docs[0];
-          await updateDoc(doc(db, 'users', userDoc.id), {
+          await adminDb.collection('users').doc(userDoc.id).update({
             plan: 'free',
             usageLimit: 10000,
             stripeSubscriptionId: null,
