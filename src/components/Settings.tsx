@@ -32,7 +32,7 @@ export function Settings() {
   const user = mockAuth.currentUser;
   const email = user?.email || '';
 
-  // Read tab from URL on mount
+  // Read tab from URL on mount, then clear URL params
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -47,6 +47,12 @@ export function Settings() {
         console.log('[Settings] Payment successful!');
       } else if (statusParam === 'cancelled') {
         console.log('[Settings] Payment cancelled');
+      }
+      
+      // Clear URL parameters after reading them
+      if (params.toString()) {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
       }
     }
   }, []);
