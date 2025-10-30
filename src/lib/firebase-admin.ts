@@ -8,19 +8,23 @@ function initializeAdminApp() {
   if (adminApp) return adminApp;
   
   if (!getApps().length) {
-    // Only initialize if credentials are available
-    if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
+    // Check if service account key is available
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       console.warn('Firebase Admin credentials not found. Admin SDK not initialized.');
       return null;
     }
 
-    adminApp = initializeApp({
-      credential: cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      }),
-    });
+    try {
+      // Parse the service account JSON
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+      });
+    } catch (error) {
+      console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', error);
+      return null;
+    }
   } else {
     adminApp = getApps()[0];
   }
