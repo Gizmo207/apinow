@@ -9,28 +9,14 @@ export function SecurityTab({ user }: SecurityTabProps) {
   const [allowedOrigins, setAllowedOrigins] = useState('*');
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setSaving(true);
     try {
-      if (!user) throw new Error('Not authenticated');
-
-      const token = await user.getIdToken();
-      const response = await fetch('/api/security/settings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ipWhitelistEnabled,
-          allowedOrigins: allowedOrigins.split(',').map(o => o.trim()).filter(Boolean),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save security settings');
-      }
-
+      const settings = {
+        ipWhitelistEnabled,
+        allowedOrigins: allowedOrigins.split(',').map(o => o.trim()).filter(Boolean),
+      };
+      localStorage.setItem('security_settings', JSON.stringify(settings));
       alert('✅ Security settings saved successfully!');
     } catch (error) {
       console.error('Failed to save settings:', error);

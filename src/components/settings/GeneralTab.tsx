@@ -11,53 +11,31 @@ export function GeneralTab({ user }: GeneralTabProps) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const loadSettings = async () => {
-      if (!user) return;
-      
-      try {
-        const token = await user.getIdToken();
-        const response = await fetch('/api/settings/general', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const settings = data.generalSettings;
+    // Load from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('general_settings');
+      if (saved) {
+        try {
+          const settings = JSON.parse(saved);
           setOrgName(settings.orgName || '');
           setRateLimit(settings.rateLimit || '100');
           setAuthMode(settings.authMode || 'required');
+        } catch (error) {
+          console.error('Failed to parse general settings:', error);
         }
-      } catch (error) {
-        console.error('Failed to load general settings:', error);
       }
-    };
+    }
+  }, []);
 
-    loadSettings();
-  }, [user]);
-
-  const handleSave = async () => {
+  const handleSave = () => {
     setSaving(true);
     try {
-      if (!user) throw new Error('Not authenticated');
-
-      const token = await user.getIdToken();
-      const response = await fetch('/api/settings/general', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          orgName,
-          rateLimit,
-          authMode,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save general settings');
-      }
-
+      const settings = {
+        orgName,
+        rateLimit,
+        authMode,
+      };
+      localStorage.setItem('general_settings', JSON.stringify(settings));
       alert('✅ General settings saved successfully!');
     } catch (error) {
       console.error('Failed to save settings:', error);

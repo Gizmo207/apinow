@@ -15,30 +15,20 @@ export function NotificationsTab({ user, email }: NotificationsTabProps) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const loadPreferences = async () => {
-      if (!user) return;
-      
-      try {
-        const token = await user.getIdToken();
-        const response = await fetch('/api/notifications/preferences', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setNotificationPrefs(data.notificationPrefs);
+    // Load from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('notification_prefs');
+      if (saved) {
+        try {
+          setNotificationPrefs(JSON.parse(saved));
+        } catch (error) {
+          console.error('Failed to parse notification preferences:', error);
         }
-      } catch (error) {
-        console.error('Failed to load notification preferences:', error);
       }
-    };
+    }
+  }, []);
 
-    loadPreferences();
-  }, [user]);
-
-  const toggleNotification = async (key: keyof typeof notificationPrefs) => {
+  const toggleNotification = (key: keyof typeof notificationPrefs) => {
     const newPrefs = {
       ...notificationPrefs,
       [key]: !notificationPrefs[key],
@@ -47,21 +37,7 @@ export function NotificationsTab({ user, email }: NotificationsTabProps) {
     
     setSaving(true);
     try {
-      if (!user) throw new Error('Not authenticated');
-
-      const token = await user.getIdToken();
-      const response = await fetch('/api/notifications/preferences', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ notificationPrefs: newPrefs }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save preferences');
-      }
+      localStorage.setItem('notification_prefs', JSON.stringify(newPrefs));
     } catch (error) {
       console.error('Failed to save preferences:', error);
       setNotificationPrefs(notificationPrefs);
