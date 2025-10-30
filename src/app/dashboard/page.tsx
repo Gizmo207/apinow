@@ -186,10 +186,7 @@ export default function DashboardPage() {
       case 'schema':
         return <SchemaExplorer databases={databases} />;
       case 'builder':
-        return <APIBuilder databases={databases} onNavigateToTester={() => {
-          setTesterKey(prev => prev + 1);
-          setCurrentView('tester');
-        }} />;
+        return <APIBuilder databases={databases} />;
       case 'endpoints':
         return <MyAPIs onNavigateToTester={() => {
           setTesterKey(prev => prev + 1);

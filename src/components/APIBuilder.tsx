@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Code, Copy, Check, Database, Play } from 'lucide-react';
+import { Save, Code, Copy, Check, Database } from 'lucide-react';
 import { getSQLiteSchema } from '@/lib/sqliteBrowser';
 
 interface APIBuilderProps {
   databases: any[];
-  onNavigateToTester?: () => void;
 }
 
-export function APIBuilder({ databases, onNavigateToTester }: APIBuilderProps) {
+export function APIBuilder({ databases }: APIBuilderProps) {
   const [selectedDb, setSelectedDb] = useState<any>(null);
   const [tables, setTables] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
@@ -273,24 +272,6 @@ export function APIBuilder({ databases, onNavigateToTester }: APIBuilderProps) {
                             </div>
                             
                             <div className="flex items-center gap-2 ml-4">
-                              <button
-                                onClick={() => {
-                                  // Set prefill data for tester
-                                  localStorage.setItem('tester_prefill', JSON.stringify({
-                                    url: `${window.location.origin}${endpoint.path}`,
-                                    method: endpoint.method,
-                                    endpointId: endpoint.id
-                                  }));
-                                  // Use proper navigation instead of reload
-                                  if (onNavigateToTester) {
-                                    onNavigateToTester();
-                                  }
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                <Play className="w-4 h-4" />
-                                Test
-                              </button>
                               <button
                                 onClick={() => saveEndpoint(endpoint)}
                                 className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
