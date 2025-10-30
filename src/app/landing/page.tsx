@@ -11,14 +11,11 @@ export default function LandingPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <img 
-                src="/logo.png" 
-                alt="APIFlow Logo" 
-                className="w-8 h-8 rounded-lg object-contain"
-              />
-              <span className="text-xl font-bold text-gray-900">APIFlow</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="APIFlow" 
+              className="h-10 w-auto object-contain"
+            />
             <button
               onClick={() => router.push('/login')}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"

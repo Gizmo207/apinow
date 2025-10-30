@@ -545,14 +545,11 @@ export default function DashboardPage() {
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
             
-            <div className="flex items-center space-x-2">
-              <img 
-                src="/logo.png" 
-                alt="APIFlow Logo" 
-                className="w-8 h-8 rounded-lg object-contain"
-              />
-              <span className="text-xl font-bold text-gray-900">APIFlow</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="APIFlow" 
+              className="h-12 w-auto object-contain"
+            />
           </div>
 
           <div className="flex items-center space-x-4">

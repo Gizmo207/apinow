@@ -34,11 +34,11 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <img 
             src="/logo.png" 
-            alt="APIFlow Logo" 
-            className="w-16 h-16 mx-auto mb-4 rounded-lg object-contain"
+            alt="APIFlow" 
+            className="h-20 w-auto mx-auto mb-4 object-contain"
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your APIFlow account</p>
+          <p className="text-gray-600">Sign in to your account</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-8">
