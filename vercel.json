@@ -4,6 +4,7 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
+  "$comment": "Force redeploy",
   "crons": [
     {
       "path": "/api/cron/reset-usage",
