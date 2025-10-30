@@ -22,13 +22,7 @@ export default function DashboardPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const isFromURLParam = useRef(false); // Track if view came from URL parameter
-  const [currentView, setCurrentView] = useState<ViewType>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dashboardView');
-      return (saved as ViewType) || 'databases';
-    }
-    return 'databases';
-  });
+  const [currentView, setCurrentView] = useState<ViewType>('databases'); // Always default to databases, don't read localStorage on initial render
   const [databases, setDatabases] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -109,6 +103,12 @@ export default function DashboardPage() {
     if (!user) {
       router.push('/landing');
       return;
+    }
+
+    // ✅ ONLY load saved view AFTER user is confirmed authenticated
+    const savedView = localStorage.getItem('dashboardView');
+    if (savedView && !isFromURLParam.current) {
+      setCurrentView(savedView as ViewType);
     }
 
     // Load databases from localStorage
@@ -554,6 +554,8 @@ export default function DashboardPage() {
   };
 
   const handleLogout = async () => {
+    // Clear saved view on logout for security
+    localStorage.removeItem('dashboardView');
     await logout();
     router.push('/landing');
   };
