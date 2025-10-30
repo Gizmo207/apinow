@@ -44,9 +44,11 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-lg">API</span>
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="APIFlow Logo" 
+            className="w-16 h-16 mx-auto mb-4 rounded-lg object-contain"
+          />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
           <p className="text-gray-600">Start building powerful APIs today</p>
         </div>

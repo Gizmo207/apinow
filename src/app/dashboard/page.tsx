@@ -546,9 +546,11 @@ export default function DashboardPage() {
             </button>
             
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">API</span>
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="APIFlow Logo" 
+                className="w-8 h-8 rounded-lg object-contain"
+              />
               <span className="text-xl font-bold text-gray-900">APIFlow</span>
             </div>
           </div>

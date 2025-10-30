@@ -8,6 +8,23 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'APIFlow - Turn Your Database Into Powerful APIs',
   description: 'Generate REST APIs from your database in minutes. No coding required.',
+  icons: {
+    icon: [
+      { url: '/logo.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/logo.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  manifest: '/site.webmanifest',
+  themeColor: '#2563eb',
+  viewport: 'width=device-width, initial-scale=1',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'APIFlow',
+  },
 };
 
 export default function RootLayout({
