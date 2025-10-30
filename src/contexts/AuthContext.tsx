@@ -1,6 +1,16 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 interface User {
   uid: string;
@@ -32,44 +42,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user in localStorage
-    const storedUser = localStorage.getItem('auth_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    // Listen to auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userData: User = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0]
+        };
+        setUser(userData);
+        
+        // Also store in localStorage for compatibility with existing code
+        localStorage.setItem('auth_user', JSON.stringify(userData));
+      } else {
+        setUser(null);
+        localStorage.removeItem('auth_user');
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const signup = async (email: string, password: string) => {
-    // Simple mock signup - store in localStorage
-    const newUser: User = {
-      uid: Math.random().toString(36).substr(2, 9),
-      email,
-      displayName: email.split('@')[0]
-    };
-    localStorage.setItem('auth_user', JSON.stringify(newUser));
-    setUser(newUser);
+    try {
+      // Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      // Create user document in Firestore 'users' collection
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.email?.split('@')[0],
+        plan: 'free',
+        usageCount: 0,
+        usageLimit: 10000,
+        createdAt: new Date().toISOString(),
+      });
+      
+      console.log('✅ User created in Firebase Auth and Firestore');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      throw new Error(error.message || 'Failed to create account');
+    }
   };
 
   const login = async (email: string, password: string) => {
-    // Simple mock login - store in localStorage
-    const newUser: User = {
-      uid: Math.random().toString(36).substr(2, 9),
-      email,
-      displayName: email.split('@')[0]
-    };
-    localStorage.setItem('auth_user', JSON.stringify(newUser));
-    setUser(newUser);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      console.log('✅ User logged in successfully');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw new Error(error.message || 'Failed to login');
+    }
   };
 
   const logout = async () => {
-    localStorage.removeItem('auth_user');
-    setUser(null);
+    try {
+      await signOut(auth);
+      localStorage.removeItem('auth_user');
+      console.log('✅ User logged out successfully');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      throw new Error(error.message || 'Failed to logout');
+    }
   };
 
   const resetPassword = async (email: string) => {
-    // Mock password reset
-    console.log('Password reset requested for:', email);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      console.log('✅ Password reset email sent');
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      throw new Error(error.message || 'Failed to send reset email');
+    }
   };
 
   const value = {
