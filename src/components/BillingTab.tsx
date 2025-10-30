@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { PLAN_LIMITS } from '@/config/plans';
 import { CheckCircle, XCircle, Zap } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BillingTabProps {
   user: any;
 }
 
 export function BillingTab({ user }: BillingTabProps) {
+  const { user: authUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState('free');
   const [usageStats, setUsageStats] = useState({
@@ -17,20 +19,17 @@ export function BillingTab({ user }: BillingTabProps) {
 
   useEffect(() => {
     loadUserPlan();
-  }, [user]);
+  }, [authUser]);
 
   const loadUserPlan = async () => {
     try {
-      const stored = localStorage.getItem('auth_user');
-      if (!stored) return;
-      const userData = JSON.parse(stored);
-      const currentUser = {
-        ...userData,
-        getIdToken: async () => `dev-${userData.uid}`
-      };
-      if (!currentUser) return;
+      if (!authUser) return;
 
-      const token = await currentUser.getIdToken();
+      // Get real Firebase ID token
+      const { auth } = await import('@/lib/firebase');
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+
       const response = await fetch('/api/user/plan', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -52,16 +51,13 @@ export function BillingTab({ user }: BillingTabProps) {
   const handleCheckout = async (priceId: string) => {
     setLoading(true);
     try {
-      const stored = localStorage.getItem('auth_user');
-      if (!stored) return;
-      const userData = JSON.parse(stored);
-      const currentUser = {
-        ...userData,
-        getIdToken: async () => `dev-${userData.uid}`
-      };
-      if (!currentUser) return;
+      if (!authUser) return;
 
-      const token = await currentUser.getIdToken();
+      // Get real Firebase ID token
+      const { auth } = await import('@/lib/firebase');
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: {
@@ -70,7 +66,7 @@ export function BillingTab({ user }: BillingTabProps) {
         },
         body: JSON.stringify({
           priceId,
-          email: currentUser.email,
+          email: authUser.email,
         }),
       });
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,9 +10,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Extract UID from token (format: "dev-{uid}" or Firebase token)
     const token = authHeader.substring(7);
-    const uid = token.startsWith('dev-') ? token.substring(4) : token;
+    
+    // Verify Firebase ID token
+    let uid: string;
+    try {
+      const decodedToken = await getAuth().verifyIdToken(token);
+      uid = decodedToken.uid;
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
 
     // Get user document from Firestore using Admin SDK
     const userDoc = await adminDb.collection('users').doc(uid).get();
