@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, LogOut, Menu, X, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +21,7 @@ type ViewType = 'dashboard' | 'databases' | 'schema' | 'builder' | 'endpoints' |
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const isFromURLParam = useRef(false); // Track if view came from URL parameter
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dashboardView');
@@ -68,13 +69,18 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Read view from URL query params
+  // Read view from URL query params, then clear URL
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const viewParam = params.get('view');
       if (viewParam && ['dashboard', 'databases', 'schema', 'builder', 'endpoints', 'api-keys', 'tester', 'docs', 'analytics', 'settings'].includes(viewParam)) {
+        isFromURLParam.current = true; // Mark that view came from URL
         setCurrentView(viewParam as ViewType);
+        
+        // Clear URL params after reading (e.g., from Stripe redirect)
+        // This prevents the view from persisting across sessions
+        window.history.replaceState({}, '', window.location.pathname);
       }
     }
   }, []);
@@ -82,7 +88,15 @@ export default function DashboardPage() {
   // Persist current view to localStorage and URL hash
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('dashboardView', currentView);
+      // Don't persist to localStorage if view came from URL parameter (e.g., Stripe redirect)
+      // This prevents the redirect destination from becoming the default view
+      if (!isFromURLParam.current) {
+        localStorage.setItem('dashboardView', currentView);
+      } else {
+        // Reset the flag after handling the initial URL param
+        isFromURLParam.current = false;
+      }
+      
       // Update URL hash to keep it in sync (replaceState doesn't trigger page reload)
       window.history.replaceState(null, '', `#${currentView}`);
     }
