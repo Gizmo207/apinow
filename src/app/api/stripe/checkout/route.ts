@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get the actual domain from the request (works in both dev and prod)
+    const origin = request.headers.get('origin') || request.headers.get('referer')?.split('/').slice(0, 3).join('/') || 'https://apinow.cloud';
+
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -26,8 +29,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?view=settings&tab=billing&status=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?view=settings&tab=billing&status=cancelled`,
+      success_url: `${origin}/dashboard?view=settings&tab=billing&status=success`,
+      cancel_url: `${origin}/dashboard?view=settings&tab=billing&status=cancelled`,
       customer_email: email,
       metadata: {
         email,
