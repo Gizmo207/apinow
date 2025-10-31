@@ -44,17 +44,23 @@ export default function DashboardPage() {
 
   // Dark mode toggle
   const toggleDarkMode = () => {
+    console.log('Toggle clicked! Current darkMode:', darkMode);
     const newMode = !darkMode;
+    console.log('Setting to:', newMode);
     setDarkMode(newMode);
     localStorage.setItem('theme', newMode ? 'dark' : 'light');
   };
 
   // Apply dark mode whenever it changes (including on mount and toggle)
   useEffect(() => {
+    console.log('useEffect running, darkMode is:', darkMode);
+    console.log('Adding/removing dark class from:', document.documentElement);
     if (darkMode) {
       document.documentElement.classList.add('dark');
+      console.log('Added dark class. Classes:', document.documentElement.className);
     } else {
       document.documentElement.classList.remove('dark');
+      console.log('Removed dark class. Classes:', document.documentElement.className);
     }
   }, [darkMode]);
 
