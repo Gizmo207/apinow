@@ -47,21 +47,16 @@ export default function DashboardPage() {
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem('theme', newMode ? 'dark' : 'light');
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
   };
 
-  // Apply dark mode on mount
+  // Apply dark mode whenever it changes (including on mount and toggle)
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, []);
+  }, [darkMode]);
 
   // Read view from URL query params, then clear URL
   useEffect(() => {
