@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, LogOut, Menu, X, Moon, Sun } from 'lucide-react';
+import { User, LogOut, Menu, X, Moon, Sun, Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dashboard } from '@/components/Dashboard';
 import { DatabaseConnector } from '@/components/DatabaseConnector';
@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [testingKey, setTestingKey] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{keyId: string, success: boolean, message: string} | null>(null);
   const [testerKey, setTesterKey] = useState(0);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -605,17 +606,46 @@ export default function DashboardPage() {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <div className="flex items-center space-x-2">
-              <User className="w-5 h-5 text-gray-600" />
-              <span className="text-sm text-gray-700">{user.email}</span>
+            
+            {/* Profile Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center transition-colors"
+                title="Profile Menu"
+              >
+                <Menu className="w-5 h-5 text-white" />
+              </button>
+              
+              {profileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <div className="px-4 py-2 border-b border-gray-200">
+                    <p className="text-xs text-gray-500">Signed in as</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setCurrentView('settings');
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <SettingsIcon className="w-4 h-4" />
+                    Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </header>
