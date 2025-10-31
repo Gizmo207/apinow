@@ -11,12 +11,66 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Basic dark mode styles */
+/* Dark mode styles */
 .dark {
   color-scheme: dark;
 }
 
 .dark body {
-  background-color: #1a1a1a;
-  color: #e5e5e5;
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Force dark backgrounds on common components */
+.dark div,
+.dark main,
+.dark header,
+.dark section,
+.dark aside {
+  border-color: #334155 !important;
+}
+
+/* White backgrounds become dark */
+.dark .bg-white {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+/* Gray backgrounds become darker */
+.dark .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+/* Text colors */
+.dark .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-gray-500 {
+  color: #64748b !important;
+}
+
+/* Borders */
+.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+.dark .border-gray-300 {
+  border-color: #475569 !important;
 }
