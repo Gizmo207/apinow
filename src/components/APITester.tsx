@@ -35,22 +35,64 @@ export function APITester() {
       
       console.log('Applying prefill:', { url, method, endpointId });
       
-      // Auto-fill URL and method
-      if (url) {
-        setUrl(url);
-        console.log('Set URL:', url);
-      }
-      if (method) {
-        setMethod(method);
-        console.log('Set method:', method);
-      }
-      
-      // Auto-select endpoint from dropdown
+      // Auto-select endpoint from dropdown first
       if (endpointId) {
         const matchingEndpoint = savedEndpoints.find(ep => ep.id === endpointId);
         if (matchingEndpoint) {
           setSelectedEndpoint(endpointId);
           console.log('Selected endpoint:', matchingEndpoint);
+          
+          // Process URL - replace :id with actual value
+          let processedUrl = url;
+          if (processedUrl && processedUrl.includes(':id')) {
+            processedUrl = processedUrl.replace(':id', '1');
+          }
+          setUrl(processedUrl);
+          console.log('Set URL:', processedUrl);
+          
+          // Set method
+          if (method) {
+            setMethod(method);
+            console.log('Set method:', method);
+          }
+          
+          // Auto-fill body for POST/PUT requests with table schema
+          if ((method === 'POST' || method === 'PUT') && matchingEndpoint.columns && matchingEndpoint.columns.length > 0) {
+            const exampleBody: any = {};
+            matchingEndpoint.columns.forEach((col: any) => {
+              // Skip auto-increment primary keys
+              if (col.primaryKey && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial') || col.name === 'id')) {
+                return;
+              }
+              
+              // Generate example values based on column type
+              const colType = col.type?.toLowerCase() || '';
+              if (colType.includes('int') || colType.includes('number')) {
+                exampleBody[col.name] = 1;
+              } else if (colType.includes('bool')) {
+                exampleBody[col.name] = true;
+              } else if (colType.includes('date') || colType.includes('time')) {
+                exampleBody[col.name] = new Date().toISOString().split('T')[0];
+              } else {
+                exampleBody[col.name] = `Example ${col.name}`;
+              }
+            });
+            setBody(JSON.stringify(exampleBody, null, 2));
+          } else {
+            setBody('');
+          }
+        }
+      } else {
+        // Fallback if no endpoint ID
+        if (url) {
+          let processedUrl = url;
+          if (processedUrl.includes(':id')) {
+            processedUrl = processedUrl.replace(':id', '1');
+          }
+          setUrl(processedUrl);
+        }
+        if (method) {
+          setMethod(method);
         }
       }
       
@@ -75,7 +117,12 @@ export function APITester() {
     const endpoint = savedEndpoints.find(ep => ep.id === endpointId);
     if (endpoint) {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-      setUrl(`${origin}${endpoint.path}`);
+      // Replace :id with example value
+      let urlPath = endpoint.path;
+      if (urlPath.includes(':id')) {
+        urlPath = urlPath.replace(':id', '1');
+      }
+      setUrl(`${origin}${urlPath}`);
       setMethod(endpoint.method);
       
       // Auto-fill body for POST/PUT requests with table schema
