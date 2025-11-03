@@ -78,13 +78,38 @@ export function APITester() {
       setUrl(`${origin}${endpoint.path}`);
       setMethod(endpoint.method);
       
-      // Auto-fill body for POST requests
-      if (endpoint.method === 'POST') {
-        setBody(JSON.stringify({
-          name: "Test Document",
-          description: "Created via API Tester",
-          createdAt: new Date().toISOString()
-        }, null, 2));
+      // Auto-fill body for POST/PUT requests with table schema
+      if (endpoint.method === 'POST' || endpoint.method === 'PUT') {
+        // Generate example body based on table columns if available
+        const exampleBody: any = {};
+        
+        // Use schema from endpoint if available
+        if (endpoint.columns && endpoint.columns.length > 0) {
+          endpoint.columns.forEach((col: any) => {
+            // Skip auto-increment primary keys
+            if (col.primaryKey && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial'))) {
+              return;
+            }
+            
+            // Generate example values based on column type
+            const colType = col.type?.toLowerCase() || '';
+            if (colType.includes('int') || colType.includes('number')) {
+              exampleBody[col.name] = 1;
+            } else if (colType.includes('bool')) {
+              exampleBody[col.name] = true;
+            } else if (colType.includes('date') || colType.includes('time')) {
+              exampleBody[col.name] = new Date().toISOString();
+            } else {
+              exampleBody[col.name] = `Example ${col.name}`;
+            }
+          });
+        } else {
+          // Fallback if no schema info
+          exampleBody.field1 = "Example value";
+          exampleBody.field2 = 123;
+        }
+        
+        setBody(JSON.stringify(exampleBody, null, 2));
       } else {
         setBody('');
       }
@@ -150,14 +175,8 @@ export function APITester() {
         if (endpointObj.database.connectionString) {
           parsedHeaders['x-db-connection'] = endpointObj.database.connectionString;
         }
-        if (endpointObj.database.filePath && endpointObj.database.type === 'sqlite') {
-          // For SQLite: Get actual file data from IndexedDB and convert to base64
-          const dbData = await getDatabaseFile(endpointObj.database.filePath);
-          if (dbData) {
-            const base64 = btoa(String.fromCharCode(...dbData));
-            parsedHeaders['x-db-file'] = base64;
-          }
-        }
+        // Note: For SQLite, we don't send the file in headers (too large)
+        // SQLite operations are handled client-side via browser WASM
       }
       
       debugLog += `Final headers: ${JSON.stringify(parsedHeaders, null, 2)}\n`;

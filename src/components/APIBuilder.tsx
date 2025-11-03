@@ -118,7 +118,8 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         path: `/api/data/${table.name}`,
         description: `Get all records from ${table.name}`,
         collection: table.name,
-        idType: 'users-list'
+        idType: 'users-list',
+        columns: table.columns || []
       });
       
       // POST create
@@ -129,7 +130,8 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         path: `/api/data/${table.name}`,
         description: `Create a new record in ${table.name}`,
         collection: table.name,
-        idType: 'users-create'
+        idType: 'users-create',
+        columns: table.columns || []
       });
       
       // GET single
@@ -140,7 +142,8 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         path: `/api/data/${table.name}/:id`,
         description: `Get a single record from ${table.name}`,
         collection: table.name,
-        idType: 'users-read'
+        idType: 'users-read',
+        columns: table.columns || []
       });
       
       // PUT update
@@ -151,7 +154,8 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         path: `/api/data/${table.name}/:id`,
         description: `Update a record in ${table.name}`,
         collection: table.name,
-        idType: 'users-update'
+        idType: 'users-update',
+        columns: table.columns || []
       });
       
       // DELETE
@@ -162,6 +166,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         path: `/api/data/${table.name}/:id`,
         description: `Delete a record from ${table.name}`,
         collection: table.name,
+        columns: table.columns || [],
         idType: 'users-delete'
       });
     });
