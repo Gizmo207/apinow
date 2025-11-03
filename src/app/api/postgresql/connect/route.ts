@@ -5,6 +5,8 @@ import { getConnectionConfig } from '@/lib/getConnectionConfig';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+import { getCurrentUserId } from '@/lib/auth-server';
+
 export async function POST(req: Request) {
   try {
     const { connectionId } = await req.json();
@@ -16,6 +18,12 @@ export async function POST(req: Request) {
     const cfg = await getConnectionConfig(connectionId);
     if (!cfg) {
       return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+    }
+
+    // Enforce ownership if present
+    const requesterId = getCurrentUserId(req);
+    if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const pool = new Pool({

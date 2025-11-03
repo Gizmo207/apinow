@@ -50,16 +50,34 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
           createdAt: new Date().toISOString()
         });
       } else if (values.connectionString) {
-        // Other databases: Use connection string
-        await onAdd({
-          id: Math.random().toString(36).substr(2, 9),
-          name: dbName,
-          type: provider.engine,
-          provider: provider.name,
-          providerKey,
-          connectionString: values.connectionString,
-          createdAt: new Date().toISOString()
-        });
+        // Other databases: Create server-side connection doc and only keep id client-side
+        try {
+          const res = await fetch('/api/connections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: provider.engine,
+              name: dbName || `${provider.name} Connection`,
+              connectionString: values.connectionString
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: 'Failed to create connection' }));
+            throw new Error(err.error || 'Failed to create connection');
+          }
+          const data = await res.json();
+          await onAdd({
+            id: data.id,
+            name: data.name || (dbName || `${provider.name} Connection`),
+            type: data.type || provider.engine,
+            provider: provider.name,
+            providerKey,
+            createdAt: new Date().toISOString()
+          });
+        } catch (e) {
+          console.error('Failed to create server-side connection:', e);
+          throw e;
+        }
       }
 
       // Reset form

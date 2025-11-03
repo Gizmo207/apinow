@@ -1,0 +1,70 @@
+[
+  {
+    "id": "pg-session-pooler",
+    "engine": "postgresql",
+    "name": "Supabase (Session Pooler)",
+    "host": "aws-1-us-east-2.pooler.supabase.com",
+    "port": 5432,
+    "user": "postgres.YOUR_HASH",
+    "password": "YOUR_SUPABASE_DB_PASSWORD",
+    "database": "postgres",
+    "ssl": true,
+    "ownerId": "<your-user-id>"
+  },
+  {
+    "id": "mysql-test",
+    "engine": "mysql",
+    "name": "MySQL Test",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "password",
+    "database": "mysql-test",
+    "ssl": false
+  },
+  {
+    "id": "mariadb-test",
+    "engine": "mariadb",
+    "name": "MariaDB Test",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "password",
+    "database": "mariadb_test",
+    "ssl": false
+  },
+  {
+    "id": "mongodb-sample",
+    "engine": "mongodb",
+    "name": "MongoDB Sample",
+    "uri": "mongodb+srv://user:pass@cluster0.mongodb.net",
+    "database": "test"
+  },
+  {
+    "id": "mssql-sample",
+    "engine": "mssql",
+    "name": "SQL Server Sample",
+    "host": "127.0.0.1",
+    "port": 1433,
+    "user": "sa",
+    "password": "YourStrong!Passw0rd",
+    "database": "master"
+  },
+  {
+    "id": "redis-sample",
+    "engine": "redis",
+    "name": "Redis Sample",
+    "host": "127.0.0.1",
+    "port": 6379,
+    "password": "",
+    "db": 0,
+    "tls": false
+  },
+  {
+    "id": "sqlite-local-file",
+    "engine": "sqlite",
+    "name": "SQLite Local",
+    "filePath": "C:/Users/Public/databases/test.db",
+    "fileName": "test.db"
+  }
+]

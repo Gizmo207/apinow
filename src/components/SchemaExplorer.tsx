@@ -129,7 +129,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            connectionString: selectedDb.connectionString,
+            connectionId: selectedDb.id,
             query: `SELECT * FROM ${table.name} LIMIT 100`
           })
         });
