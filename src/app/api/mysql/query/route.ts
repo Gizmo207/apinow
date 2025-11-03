@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import * as mysql from 'mysql2/promise';
 import { getConnectionConfig } from '@/lib/getConnectionConfig';
 import { getCurrentUserId } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Force recompile
 
 function isSafeSelect(sql: string): boolean {
   const s = sql.trim().replace(/;+$\s*/g, '');

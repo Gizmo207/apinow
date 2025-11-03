@@ -141,6 +141,12 @@ export function APITester() {
       if (endpointObj && endpointObj.database) {
         console.log('[API Tester] Adding database headers:', endpointObj.database);
         parsedHeaders['x-db-type'] = endpointObj.database.type;
+        
+        // Add connection ID for secure server-side credential lookup
+        if (endpointObj.database.id) {
+          parsedHeaders['x-connection-id'] = endpointObj.database.id;
+        }
+        
         if (endpointObj.database.connectionString) {
           parsedHeaders['x-db-connection'] = endpointObj.database.connectionString;
         }

@@ -10,7 +10,24 @@ export function APIBuilder({ databases }: APIBuilderProps) {
   const [selectedDb, setSelectedDb] = useState<any>(null);
   const [tables, setTables] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
+  const [savedEndpoints, setSavedEndpoints] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Load saved endpoints from localStorage
+  useEffect(() => {
+    const loadSavedEndpoints = () => {
+      const saved = JSON.parse(localStorage.getItem('saved_endpoints') || '[]');
+      setSavedEndpoints(saved);
+    };
+    
+    loadSavedEndpoints();
+    
+    // Listen for endpoint save events
+    const handleEndpointsSaved = () => loadSavedEndpoints();
+    window.addEventListener('endpointsSaved', handleEndpointsSaved);
+    
+    return () => window.removeEventListener('endpointsSaved', handleEndpointsSaved);
+  }, []);
 
   useEffect(() => {
     if (selectedDb) {
@@ -238,11 +255,26 @@ export function APIBuilder({ databases }: APIBuilderProps) {
           ) : tables.length === 0 ? (
             <p className="text-gray-600">No tables found in this database</p>
           ) : (
-            <div className="space-y-6">
-              {tables.map(table => {
-                const tableEndpoints = endpoints.filter(ep => ep.table === table.name);
-                
-                return (
+            <>
+              {endpoints.filter(ep => !savedEndpoints.some(saved => saved.id === ep.id)).length === 0 ? (
+                <div className="text-center py-8 text-gray-600">
+                  <Check className="w-12 h-12 text-green-600 mx-auto mb-3" />
+                  <p className="font-medium">All endpoints have been saved!</p>
+                  <p className="text-sm mt-1">Go to the API Tester to test your endpoints.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {tables.map(table => {
+                    // Filter out already saved endpoints
+                    const tableEndpoints = endpoints.filter(ep => 
+                      ep.table === table.name && 
+                      !savedEndpoints.some(saved => saved.id === ep.id)
+                    );
+                    
+                    // Skip tables with no available endpoints
+                    if (tableEndpoints.length === 0) return null;
+                    
+                    return (
                   <div key={table.name} className="border rounded-lg p-4">
                     {/* Table Header */}
                     <div className="mb-4 pb-3 border-b">
@@ -292,6 +324,8 @@ export function APIBuilder({ databases }: APIBuilderProps) {
                 );
               })}
             </div>
+              )}
+            </>
           )}
         </div>
       )}

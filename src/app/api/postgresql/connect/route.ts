@@ -38,10 +38,14 @@ export async function POST(req: Request) {
       connectionTimeoutMillis: 5000,
     });
 
-    const client = await pool.connect();
+    // Add error handler to prevent uncaught exceptions
+    pool.on('error', (err) => {
+      console.error('[pg pool error event]:', err?.message || err);
+    });
+
     try {
       // List public tables
-      const tablesResult = await client.query(`
+      const tablesResult = await pool.query(`
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = 'public'
@@ -53,7 +57,7 @@ export async function POST(req: Request) {
       // Build schema map
       const schema: Record<string, { name: string; type: string; nullable: boolean; primaryKey: boolean }[]> = {};
       for (const tableName of tableNames) {
-        const columnsResult = await client.query(
+        const columnsResult = await pool.query(
           `SELECT column_name, data_type, is_nullable, column_default
            FROM information_schema.columns
            WHERE table_schema = 'public' AND table_name = $1
@@ -61,7 +65,7 @@ export async function POST(req: Request) {
           [tableName]
         );
 
-        const pkResult = await client.query(
+        const pkResult = await pool.query(
           `SELECT a.attname
            FROM pg_index i
            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -78,16 +82,20 @@ export async function POST(req: Request) {
         }));
       }
 
-      client.release();
       await pool.end();
-
       return NextResponse.json({ success: true, tables: tableNames, schema });
     } catch (err: any) {
-      client.release();
-      await pool.end();
+      try { await pool.end(); } catch {}
       // Map common auth error to 401
-      if (typeof err?.code === 'string' && err.code === '28P01') {
-        return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
+      if (typeof err?.code === 'string') {
+        if (err.code === '28P01') {
+          return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
+        }
+        if (err.code === 'XX000') {
+          const res = NextResponse.json({ error: 'Database temporarily unavailable' }, { status: 503 });
+          res.headers.set('Retry-After', '2');
+          return res;
+        }
       }
       console.error('PostgreSQL connect error:', err?.message || err);
       return NextResponse.json({ error: 'Connection error' }, { status: 500 });

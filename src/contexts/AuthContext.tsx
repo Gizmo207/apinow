@@ -90,7 +90,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      // Check if user document exists in Firestore, create if missing
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      if (!userDocSnap.exists()) {
+        console.log('User document missing, creating...');
+        await setDoc(userDocRef, {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.email?.split('@')[0],
+          plan: 'free',
+          usageCount: 0,
+          usageLimit: 10000,
+          createdAt: new Date().toISOString(),
+        });
+        console.log('✅ User document created in Firestore');
+      }
+      
       console.log('✅ User logged in successfully');
     } catch (error: any) {
       console.error('Login error:', error);

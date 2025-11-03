@@ -66,15 +66,27 @@ export async function POST(req: Request) {
     connectionTimeoutMillis: 5000,
   });
 
+  // Add error handler to prevent uncaught exceptions
+  pool.on('error', (err) => {
+    console.error('[pg pool error event]:', err?.message || err);
+  });
+
   const client = await pool.connect();
   try {
     const result = await client.query(query);
     const rows = result?.rows ?? [];
     return NextResponse.json({ success: true, rows });
   } catch (err: any) {
-    // Map auth error
-    if (typeof err?.code === 'string' && err.code === '28P01') {
-      return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
+    // Map auth and transient errors
+    if (typeof err?.code === 'string') {
+      if (err.code === '28P01') {
+        return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
+      }
+      if (err.code === 'XX000') {
+        const res = NextResponse.json({ error: 'Database temporarily unavailable' }, { status: 503 });
+        res.headers.set('Retry-After', '2');
+        return res;
+      }
     }
     console.error('PostgreSQL query error:', err?.message || err);
     return NextResponse.json({ error: 'Query error' }, { status: 500 });
