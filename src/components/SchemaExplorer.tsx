@@ -20,15 +20,17 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   }, [databases]);
 
   useEffect(() => {
-    if (selectedDb) {
+    if (!selectedDb?.id) return;
+    const handle = setTimeout(() => {
       loadSchema();
-    }
-  }, [selectedDb]);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [selectedDb?.id]);
 
   const loadSchema = async () => {
     if (!selectedDb) return;
     
-    console.log('Loading schema for database:', selectedDb);
+    console.log('Loading schema for database id/type:', { id: selectedDb?.id, type: selectedDb?.type });
     
     setLoading(true);
     try {
@@ -46,21 +48,18 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       
       let res;
       if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb') {
-        console.log('Calling MySQL connect API with:', selectedDb.connectionString);
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connectionString: selectedDb.connectionString })
         });
       } else if (selectedDb.type === 'postgresql') {
-        console.log('Calling PostgreSQL connect API with:', selectedDb.connectionString);
         res = await fetch('/api/postgresql/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+          body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else if (selectedDb.type === 'mongodb') {
-        console.log('Calling MongoDB connect API with:', selectedDb.connectionString);
         res = await fetch('/api/mongodb/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

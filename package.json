@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:conn": "node scripts/seed-connection.js",
+    "seed:conn:file": "node scripts/seed-connection.js --file=scripts/connections.sample.json"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.917.0",

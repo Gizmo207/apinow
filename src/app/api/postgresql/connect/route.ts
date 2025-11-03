@@ -1,82 +1,65 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Client } from 'pg';
+import { NextResponse } from 'next/server';
+import { Pool } from 'pg';
+import { getConnectionConfig } from '@/lib/getConnectionConfig';
 
-export async function POST(request: NextRequest) {
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: Request) {
   try {
-    const { connectionString } = await request.json();
+    const { connectionId } = await req.json();
 
-    if (!connectionString) {
-      return NextResponse.json(
-        { error: 'Connection string is required' },
-        { status: 400 }
-      );
+    if (!connectionId) {
+      return NextResponse.json({ error: 'Missing connectionId' }, { status: 400 });
     }
 
-    // Parse connection string and configure SSL
-    let connectionConfig: any;
-    
-    // PostgreSQL providers often use sslmode parameter
-    if (connectionString.includes('sslmode=require') || connectionString.includes('ssl=true')) {
-      connectionConfig = {
-        connectionString: connectionString,
-        ssl: {
-          rejectUnauthorized: false
-        }
-      };
-    } else {
-      connectionConfig = {
-        connectionString: connectionString
-      };
+    const cfg = await getConnectionConfig(connectionId);
+    if (!cfg) {
+      return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
     }
 
-    const client = new Client(connectionConfig);
+    const pool = new Pool({
+      host: cfg.host,
+      port: cfg.port,
+      user: cfg.user,
+      password: cfg.password,
+      database: cfg.database,
+      ssl: cfg.ssl ? { rejectUnauthorized: false } : undefined,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
 
+    const client = await pool.connect();
     try {
-      // Connect to database
-      await client.connect();
-      
-      console.log('PostgreSQL connected successfully');
-
-      // Get current database name
-      const dbResult = await client.query('SELECT current_database()');
-      const database = dbResult.rows[0].current_database;
-      
-      console.log('Database name:', database);
-
-      // Get all tables from public schema
+      // List public tables
       const tablesResult = await client.query(`
-        SELECT tablename 
-        FROM pg_catalog.pg_tables 
-        WHERE schemaname = 'public'
-        ORDER BY tablename
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+        ORDER BY table_name;
       `);
 
-      console.log('Found tables:', tablesResult.rows);
+      const tableNames = tablesResult.rows.map((r: any) => r.table_name || r.tablename);
 
-      const tableNames = tablesResult.rows.map((row: any) => row.tablename);
-
-      // Get schema for each table
-      const schema: any = {};
+      // Build schema map
+      const schema: Record<string, { name: string; type: string; nullable: boolean; primaryKey: boolean }[]> = {};
       for (const tableName of tableNames) {
-        const columnsResult = await client.query(`
-          SELECT 
-            column_name,
-            data_type,
-            is_nullable,
-            column_default
-          FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = $1
-          ORDER BY ordinal_position
-        `, [tableName]);
+        const columnsResult = await client.query(
+          `SELECT column_name, data_type, is_nullable, column_default
+           FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = $1
+           ORDER BY ordinal_position`,
+          [tableName]
+        );
 
-        // Get primary key info
-        const pkResult = await client.query(`
-          SELECT a.attname
-          FROM pg_index i
-          JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-          WHERE i.indrelid = $1::regclass AND i.indisprimary
-        `, [`public.${tableName}`]);
-
+        const pkResult = await client.query(
+          `SELECT a.attname
+           FROM pg_index i
+           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+           WHERE i.indrelid = $1::regclass AND i.indisprimary`,
+          [`public.${tableName}`]
+        );
         const primaryKeys = pkResult.rows.map((row: any) => row.attname);
 
         schema[tableName] = columnsResult.rows.map((col: any) => ({
@@ -87,33 +70,21 @@ export async function POST(request: NextRequest) {
         }));
       }
 
-      await client.end();
+      client.release();
+      await pool.end();
 
-      console.log('Returning response:', { tableCount: tableNames.length, tables: tableNames });
-
-      return NextResponse.json({
-        success: true,
-        message: 'Connected successfully',
-        tables: tableNames,
-        schema,
-      });
-    } catch (error: any) {
-      await client.end();
-      throw error;
+      return NextResponse.json({ success: true, tables: tableNames, schema });
+    } catch (err: any) {
+      client.release();
+      await pool.end();
+      // Map common auth error to 401
+      if (typeof err?.code === 'string' && err.code === '28P01') {
+        return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
+      }
+      console.error('PostgreSQL connect error:', err?.message || err);
+      return NextResponse.json({ error: 'Connection error' }, { status: 500 });
     }
-  } catch (error: any) {
-    console.error('PostgreSQL connection error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      stack: error.stack
-    });
-    return NextResponse.json(
-      { 
-        error: error.message || 'Failed to connect to PostgreSQL database',
-        details: error.code || 'Unknown error'
-      },
-      { status: 500 }
-    );
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Invalid request' }, { status: 400 });
   }
 }
