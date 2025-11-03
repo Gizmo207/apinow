@@ -1,67 +1,66 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
+import { getConnectionConfig } from '@/lib/getConnectionConfig';
+import { getCurrentUserId } from '@/lib/auth-server';
 
-export async function POST(request: NextRequest) {
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+function isSafeSelect(sql: string): boolean {
+  const s = sql.trim().replace(/;+$\s*/g, '');
+  if (!/^select\s/i.test(s)) return false;
+  const forbidden = /(insert\s|update\s|delete\s|drop\s|truncate\s|alter\s|create\s|grant\s|revoke\s|comment\s|merge\s|call\s|execute\s)/i;
+  return !forbidden.test(s);
+}
+
+export async function POST(req: Request) {
   try {
-    const { connectionString, query, params } = await request.json();
+    const body = await req.json();
+    const connectionId = body?.connectionId as string | undefined;
+    const query = body?.query as string | undefined;
 
-    if (!connectionString || !query) {
-      return NextResponse.json(
-        { error: 'Connection string and query are required' },
-        { status: 400 }
-      );
+    if (!connectionId) {
+      return NextResponse.json({ error: 'Missing connectionId' }, { status: 400 });
+    }
+    if (!query || typeof query !== 'string') {
+      return NextResponse.json({ error: 'Missing query' }, { status: 400 });
+    }
+    if (!isSafeSelect(query)) {
+      return NextResponse.json({ error: 'Only SELECT queries are allowed' }, { status: 422 });
     }
 
-    // Parse connection string and handle SSL
-    let connectionConfig: any;
-    
-    if (connectionString.includes('ssl-mode=REQUIRED')) {
-      // Aiven format - parse and configure SSL properly
-      const cleanUrl = connectionString.replace('?ssl-mode=REQUIRED', '');
-      
-      // Parse the connection string manually
-      const urlMatch = cleanUrl.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
-      
-      if (urlMatch) {
-        connectionConfig = {
-          host: urlMatch[3],
-          port: parseInt(urlMatch[4]),
-          user: urlMatch[1],
-          password: urlMatch[2],
-          database: urlMatch[5],
-          ssl: {
-            rejectUnauthorized: false // Aiven uses self-signed certs
-          }
-        };
-      } else {
-        connectionConfig = cleanUrl;
-      }
-    } else {
-      connectionConfig = connectionString;
+    const cfg = await getConnectionConfig(connectionId);
+    if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+
+    const requesterId = getCurrentUserId(req);
+    if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Create connection
-    const connection = await mysql.createConnection(connectionConfig);
+    const connection = await mysql.createConnection({
+      host: cfg.host,
+      port: (cfg as any).port || 3306,
+      user: cfg.user,
+      password: cfg.password,
+      database: cfg.database,
+      ssl: (cfg as any).ssl ? { rejectUnauthorized: false } : undefined,
+    } as any);
 
     try {
-      // Execute query with parameters
-      const [results] = await connection.execute(query, params || []);
-
+      const [rows] = await connection.query(query);
       await connection.end();
-
-      return NextResponse.json({
-        success: true,
-        data: results,
-      });
-    } catch (error: any) {
+      return NextResponse.json({ success: true, rows });
+    } catch (err: any) {
       await connection.end();
-      throw error;
+      const msg = err?.message || String(err);
+      // MySQL auth errors typically include ER_ACCESS_DENIED_ERROR code 'ER_ACCESS_DENIED_ERROR'
+      if (err?.code === 'ER_ACCESS_DENIED_ERROR') {
+        return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
+      }
+      console.error('MySQL query error:', msg);
+      return NextResponse.json({ error: 'Query error' }, { status: 500 });
     }
-  } catch (error: any) {
-    console.error('MySQL query error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to execute query' },
-      { status: 500 }
-    );
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Invalid request' }, { status: 400 });
   }
 }

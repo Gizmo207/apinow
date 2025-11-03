@@ -1,43 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
+import { getConnectionConfig } from '@/lib/getConnectionConfig';
+import { getCurrentUserId } from '@/lib/auth-server';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { connectionString } = await request.json();
+    const body = await request.json();
+    const connectionId = body?.connectionId as string | undefined;
+    const connectionString = body?.connectionString as string | undefined;
 
-    if (!connectionString) {
+    if (!connectionId && !connectionString) {
       return NextResponse.json(
-        { error: 'Connection string is required' },
+        { error: 'Missing connectionId or connectionString' },
         { status: 400 }
       );
     }
 
-    // Parse connection string and handle SSL
+    // Build connection config from Firestore when connectionId is provided
     let connectionConfig: any;
-    
-    if (connectionString.includes('ssl-mode=REQUIRED')) {
-      // Aiven format - parse and configure SSL properly
-      const cleanUrl = connectionString.replace('?ssl-mode=REQUIRED', '');
-      
-      // Parse the connection string manually
-      const urlMatch = cleanUrl.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
-      
-      if (urlMatch) {
-        connectionConfig = {
-          host: urlMatch[3],
-          port: parseInt(urlMatch[4]),
-          user: urlMatch[1],
-          password: urlMatch[2],
-          database: urlMatch[5],
-          ssl: {
-            rejectUnauthorized: false // Aiven uses self-signed certs
-          }
-        };
-      } else {
-        connectionConfig = cleanUrl;
+    if (connectionId) {
+      const cfg = await getConnectionConfig(connectionId);
+      if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+      const requesterId = getCurrentUserId(request);
+      if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
+      connectionConfig = {
+        host: cfg.host,
+        port: cfg.port || 3306,
+        user: cfg.user,
+        password: cfg.password,
+        database: cfg.database,
+        ssl: cfg.ssl ? { rejectUnauthorized: false } : undefined,
+      };
     } else {
-      connectionConfig = connectionString;
+      // Backward compatibility: accept raw connection string
+      if (connectionString.includes('ssl-mode=REQUIRED')) {
+        // Aiven format - parse and configure SSL properly
+        const cleanUrl = connectionString.replace('?ssl-mode=REQUIRED', '');
+        const urlMatch = cleanUrl.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
+        if (urlMatch) {
+          connectionConfig = {
+            host: urlMatch[3],
+            port: parseInt(urlMatch[4]),
+            user: urlMatch[1],
+            password: urlMatch[2],
+            database: urlMatch[5],
+            ssl: { rejectUnauthorized: false },
+          };
+        } else {
+          connectionConfig = cleanUrl;
+        }
+      } else {
+        connectionConfig = connectionString;
+      }
     }
 
     // Create connection

@@ -47,22 +47,26 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       }
       
       let res;
+      const authUserRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+      const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authUser?.uid) headers['x-user-id'] = authUser.uid;
       if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb') {
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else if (selectedDb.type === 'postgresql') {
         res = await fetch('/api/postgresql/connect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else if (selectedDb.type === 'mongodb') {
         res = await fetch('/api/mongodb/connect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ connectionString: selectedDb.connectionString })
         });
       } else {
@@ -120,7 +124,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            connectionString: selectedDb.connectionString,
+            connectionId: selectedDb.id,
             query: `SELECT * FROM ${table.name} LIMIT 100`
           })
         });

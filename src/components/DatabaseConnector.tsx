@@ -52,13 +52,18 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
       } else if (values.connectionString) {
         // Other databases: Create server-side connection doc and only keep id client-side
         try {
+          const authUserRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+          const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (authUser?.uid) headers['x-user-id'] = authUser.uid;
           const res = await fetch('/api/connections', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
               type: provider.engine,
               name: dbName || `${provider.name} Connection`,
-              connectionString: values.connectionString
+              connectionString: values.connectionString,
+              ownerId: authUser?.uid
             })
           });
           if (!res.ok) {

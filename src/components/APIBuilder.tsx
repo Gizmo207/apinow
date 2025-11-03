@@ -37,17 +37,21 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       }
       
       let res;
+      const authUserRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+      const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authUser?.uid) headers['x-user-id'] = authUser.uid;
       if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb') {
         res = await fetch('/api/mysql/connect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else if (selectedDb.type === 'postgresql') {
         res = await fetch('/api/postgresql/connect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else if (selectedDb.type === 'mongodb') {
         res = await fetch('/api/mongodb/connect', {

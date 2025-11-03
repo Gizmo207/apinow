@@ -39,6 +39,24 @@ function parsePostgresDsn(dsn: string) {
   }
 }
 
+// Minimal MySQL/MariaDB DSN parser (mysql:// or mariadb://)
+function parseMysqlDsn(dsn: string) {
+  try {
+    const url = new URL(dsn);
+    if (url.protocol !== 'mysql:' && url.protocol !== 'mariadb:') return null;
+    const host = url.hostname;
+    const port = url.port ? Number(url.port) : 3306;
+    const user = decodeURIComponent(url.username);
+    const password = decodeURIComponent(url.password);
+    const database = url.pathname && url.pathname.length > 1 ? decodeURIComponent(url.pathname.slice(1)) : '';
+    const sslParam = url.searchParams.get('ssl') || url.searchParams.get('ssl-mode') || url.searchParams.get('sslmode');
+    const ssl = sslParam ? (sslParam === 'require' || sslParam === 'REQUIRED' || parseBoolean(sslParam, false)) : undefined;
+    return { host, port, user, password, database, ssl };
+  } catch {
+    return null;
+  }
+}
+
 import { getCurrentUserId } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
@@ -104,15 +122,34 @@ export async function POST(req: NextRequest) {
       };
     } else {
       // For other engines (mysql, mariadb, mongodb, mssql, redis):
-      // Store what was provided. You can extend this later per engine.
       const connectionString = sanitizeString(body.connectionString);
       if (!connectionString) {
         return NextResponse.json({ error: 'Missing connectionString for this engine' }, { status: 422 });
       }
-      docData = {
-        ...docData,
-        connectionString,
-      };
+
+      if (type === 'mysql' || type === 'mariadb') {
+        // Parse DSN and persist discrete fields too
+        const parsed = parseMysqlDsn(connectionString);
+        if (!parsed) {
+          return NextResponse.json({ error: 'Invalid MySQL/MariaDB connection string' }, { status: 422 });
+        }
+        docData = {
+          ...docData,
+          connectionString,
+          host: sanitizeString(body.host) || parsed.host,
+          port: body.port != null ? Number(body.port) : parsed.port,
+          user: sanitizeString(body.user) || parsed.user,
+          password: sanitizeString(body.password) || parsed.password,
+          database: sanitizeString(body.database) || parsed.database,
+          ssl: body.ssl != null ? parseBoolean(body.ssl) : (parsed.ssl ?? false),
+        };
+      } else {
+        // Persist as-is for now (mongodb/mssql/redis)
+        docData = {
+          ...docData,
+          connectionString,
+        };
+      }
     }
 
     const ref = await adminDb.collection('database_connections').add(docData);
@@ -121,5 +158,51 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     const message = typeof e?.message === 'string' ? e.message : 'Invalid request';
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+// List connections for current user
+export async function GET(req: NextRequest) {
+  try {
+    const requesterId = getCurrentUserId(req);
+    if (!requesterId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const qs = req.nextUrl.searchParams;
+    const limit = Number(qs.get('limit') || 50);
+    const snap = await adminDb.collection('database_connections')
+      .where('ownerId', '==', requesterId)
+      .orderBy('createdAt', 'desc')
+      .limit(Math.min(limit, 200))
+      .get();
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data(), password: undefined, connectionString: undefined }));
+    return NextResponse.json({ items });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Failed to list connections' }, { status: 500 });
+  }
+}
+
+// Delete a connection (by id). Enforces ownership.
+export async function DELETE(req: NextRequest) {
+  try {
+    const requesterId = getCurrentUserId(req);
+    if (!requesterId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const body = await req.json().catch(() => ({}));
+    const id = sanitizeString(body.id) || req.nextUrl.searchParams.get('id') || undefined;
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    const ref = adminDb.collection('database_connections').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const data = snap.data() as any;
+    if (data?.ownerId && data.ownerId !== requesterId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    await ref.delete();
+    return new NextResponse(null, { status: 204 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Failed to delete connection' }, { status: 500 });
   }
 }
