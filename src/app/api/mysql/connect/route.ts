@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       console.log('Password (first 3 chars):', cfg.password?.substring(0, 3) || '(empty)');
       console.log('Database:', cfg.database);
       console.log('================================');
-    } else {
+    } else if (connectionString) {
       // Backward compatibility: accept raw connection string
       if (connectionString.includes('ssl-mode=REQUIRED')) {
         // Aiven format - parse and configure SSL properly
@@ -68,6 +68,11 @@ export async function POST(request: NextRequest) {
       } else {
         connectionConfig = connectionString;
       }
+    } else {
+      return NextResponse.json(
+        { error: 'Connection string is required' },
+        { status: 400 }
+      );
     }
 
     // Create connection
