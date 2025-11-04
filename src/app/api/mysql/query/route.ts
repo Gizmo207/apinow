@@ -14,6 +14,15 @@ function isSafeSelect(sql: string): boolean {
   return !forbidden.test(s);
 }
 
+function isAllowedQuery(sql: string): boolean {
+  const s = sql.trim();
+  // Allow SELECT, CREATE TABLE, INSERT, UPDATE, DELETE, ALTER TABLE
+  const allowed = /^(select\s|create\s+table\s|insert\s+into\s|update\s|delete\s+from\s|alter\s+table\s)/i;
+  // Block dangerous operations
+  const forbidden = /\b(drop\s+database|drop\s+schema|truncate\s+database|grant\s|revoke\s|create\s+user|drop\s+user)\b/i;
+  return allowed.test(s) && !forbidden.test(s);
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -26,8 +35,8 @@ export async function POST(req: Request) {
     if (!query || typeof query !== 'string') {
       return NextResponse.json({ error: 'Missing query' }, { status: 400 });
     }
-    if (!isSafeSelect(query)) {
-      return NextResponse.json({ error: 'Only SELECT queries are allowed' }, { status: 422 });
+    if (!isAllowedQuery(query)) {
+      return NextResponse.json({ error: 'Query not allowed. Only SELECT, CREATE TABLE, INSERT, UPDATE, DELETE, and ALTER TABLE queries are permitted.' }, { status: 422 });
     }
 
     const cfg = await getConnectionConfig(connectionId);
@@ -48,9 +57,10 @@ export async function POST(req: Request) {
     } as any);
 
     try {
-      const [rows] = await connection.query(query);
+      const [result] = await connection.query(query);
       await connection.end();
-      return NextResponse.json({ success: true, rows });
+      // For CREATE/INSERT/UPDATE/DELETE, result is metadata, not rows
+      return NextResponse.json({ success: true, rows: Array.isArray(result) ? result : [], result });
     } catch (err: any) {
       await connection.end();
       const msg = err?.message || String(err);

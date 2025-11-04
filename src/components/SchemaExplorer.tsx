@@ -12,6 +12,9 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
   const [selectedTable, setSelectedTable] = useState<any>(null);
   const [tableData, setTableData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sqlQuery, setSqlQuery] = useState('');
+  const [queryResult, setQueryResult] = useState<string | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (databases.length > 0 && !selectedDb) {
@@ -166,6 +169,43 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
     }
   };
 
+  const runSqlQuery = async () => {
+    if (!sqlQuery.trim() || !selectedDb) return;
+    
+    setLoading(true);
+    setQueryError(null);
+    setQueryResult(null);
+    
+    try {
+      const authUserRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+      const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+      
+      const response = await fetch('/api/mysql/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: selectedDb.id,
+          userId: authUser?.uid,
+          query: sqlQuery
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        setQueryError(data.error || 'Query failed');
+      } else {
+        setQueryResult('✅ Query executed successfully!');
+        // Refresh schema to show new tables
+        loadSchema();
+      }
+    } catch (error: any) {
+      setQueryError(error.message || 'Failed to execute query');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (databases.length === 0) {
     return (
       <div className="text-center py-12 bg-white rounded-lg border">
@@ -193,6 +233,36 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           ))}
         </select>
       </div>
+
+      {/* SQL Query Runner - Only for MySQL/PostgreSQL */}
+      {selectedDb?.type !== 'sqlite' && (
+        <div className="bg-white rounded-lg border p-4 mb-6">
+          <h3 className="font-semibold mb-3">Run SQL Query</h3>
+          <textarea
+            value={sqlQuery}
+            onChange={(e) => setSqlQuery(e.target.value)}
+            placeholder="Enter your SQL query here...&#10;&#10;Example:&#10;CREATE TABLE users (&#10;  id INT AUTO_INCREMENT PRIMARY KEY,&#10;  email VARCHAR(255) UNIQUE NOT NULL,&#10;  username VARCHAR(100) NOT NULL&#10;);"
+            className="w-full h-32 px-3 py-2 border rounded-lg font-mono text-sm mb-3"
+          />
+          <button
+            onClick={runSqlQuery}
+            disabled={loading || !sqlQuery.trim()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Running...' : 'Run Query'}
+          </button>
+          {queryResult && (
+            <div className="mt-3 p-3 bg-green-50 text-green-700 rounded-lg text-sm">
+              {queryResult}
+            </div>
+          )}
+          {queryError && (
+            <div className="mt-3 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+              ❌ {queryError}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-6">
         {/* Tables List */}

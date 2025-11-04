@@ -437,13 +437,24 @@ export default function DashboardPage() {
                                     const testData: any = {};
                                     const timestamp = Date.now();
                                     
+                                    // Helper to generate UUID
+                                    const generateUUID = () => {
+                                      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                                        const r = Math.random() * 16 | 0;
+                                        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                                        return v.toString(16);
+                                      });
+                                    };
+                                    
                                     if (testEndpoint.columns) {
                                       testEndpoint.columns.forEach((col: any) => {
                                         if (col.primaryKey || col.name === 'id') return;
                                         const colType = col.type?.toLowerCase() || '';
                                         const colName = col.name?.toLowerCase() || '';
                                         
-                                        if (colType.includes('int')) {
+                                        if (colType.includes('uuid')) {
+                                          testData[col.name] = generateUUID();
+                                        } else if (colType.includes('int')) {
                                           testData[col.name] = 1;
                                         } else if (colType.includes('bool')) {
                                           testData[col.name] = true;

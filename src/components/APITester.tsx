@@ -54,12 +54,24 @@ export function APITester() {
                 if (matchingEndpoint.columns) {
                   const testData: any = {};
                   const timestamp = Date.now();
+                  
+                  // Helper to generate UUID
+                  const generateUUID = () => {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                      const r = Math.random() * 16 | 0;
+                      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                      return v.toString(16);
+                    });
+                  };
+                  
                   matchingEndpoint.columns.forEach((col: any) => {
                     if (col.primaryKey || col.name === 'id') return;
                     const colType = col.type?.toLowerCase() || '';
                     const colName = col.name?.toLowerCase() || '';
                     
-                    if (colType.includes('int')) {
+                    if (colType.includes('uuid')) {
+                      testData[col.name] = generateUUID();
+                    } else if (colType.includes('int')) {
                       testData[col.name] = 1;
                     } else if (colType.includes('bool')) {
                       testData[col.name] = true;
@@ -146,6 +158,16 @@ export function APITester() {
           if ((method === 'POST' || method === 'PUT') && matchingEndpoint.columns && matchingEndpoint.columns.length > 0) {
             const exampleBody: any = {};
             const timestamp = Date.now();
+            
+            // Helper to generate UUID
+            const generateUUID = () => {
+              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+              });
+            };
+            
             matchingEndpoint.columns.forEach((col: any) => {
               // Skip auto-increment primary keys
               if (col.primaryKey && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial') || col.name === 'id')) {
@@ -156,7 +178,9 @@ export function APITester() {
               const colType = col.type?.toLowerCase() || '';
               const colName = col.name?.toLowerCase() || '';
               
-              if (colType.includes('int') || colType.includes('number')) {
+              if (colType.includes('uuid')) {
+                exampleBody[col.name] = generateUUID();
+              } else if (colType.includes('int') || colType.includes('number')) {
                 exampleBody[col.name] = 1;
               } else if (colType.includes('bool')) {
                 exampleBody[col.name] = true;
