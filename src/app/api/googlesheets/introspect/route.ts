@@ -10,25 +10,20 @@ export async function POST(request: NextRequest) {
     
     let sheetId = connectionString;
     
-    // If connectionId is provided, fetch from stored connections
+    // If connectionId is provided, fetch directly from Firebase
     if (connectionId) {
-      const authUserRaw = request.headers.get('x-user-id');
-      if (!authUserRaw) {
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const doc = await adminDb.collection('database_connections').doc(connectionId).get();
+      
+      if (!doc.exists) {
         return NextResponse.json(
-          { error: 'User ID required for stored connections' },
-          { status: 401 }
+          { error: 'Connection not found' },
+          { status: 404 }
         );
       }
       
-      // Fetch connection from storage
-      const connectionsRes = await fetch(`${request.nextUrl.origin}/api/connections?userId=${authUserRaw}`);
-      if (connectionsRes.ok) {
-        const connections = await connectionsRes.json();
-        const connection = connections.find((c: any) => c.id === connectionId);
-        if (connection) {
-          sheetId = connection.connectionString;
-        }
-      }
+      const data = doc.data();
+      sheetId = data?.connectionString;
     }
     
     if (!sheetId) {
