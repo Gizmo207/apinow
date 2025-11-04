@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const isFromURLParam = useRef(false); // Track if view came from URL parameter
   const [currentView, setCurrentView] = useState<ViewType>('databases'); // Always default to databases, don't read localStorage on initial render
+  const [viewHistory, setViewHistory] = useState<ViewType[]>([]); // Track navigation history
   const [databases, setDatabases] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,6 +43,25 @@ export default function DashboardPage() {
     }
     return false;
   });
+
+  // Navigate with history tracking
+  const navigateToView = (newView: ViewType) => {
+    if (newView !== currentView) {
+      setViewHistory(prev => [...prev, currentView]);
+      setCurrentView(newView);
+      localStorage.setItem('dashboardView', newView);
+    }
+  };
+
+  // Go back to previous view
+  const goBack = () => {
+    if (viewHistory.length > 0) {
+      const previousView = viewHistory[viewHistory.length - 1];
+      setViewHistory(prev => prev.slice(0, -1));
+      setCurrentView(previousView);
+      localStorage.setItem('dashboardView', previousView);
+    }
+  };
 
   // Dark mode toggle
   const toggleDarkMode = () => {
@@ -128,8 +148,13 @@ export default function DashboardPage() {
     // Load endpoints from localStorage
     const loadEndpoints = () => {
       const endpointsStored = localStorage.getItem('saved_endpoints');
+      console.log('[Dashboard] Loading endpoints from localStorage:', endpointsStored);
       if (endpointsStored) {
-        setEndpoints(JSON.parse(endpointsStored));
+        const parsed = JSON.parse(endpointsStored);
+        console.log('[Dashboard] Parsed endpoints:', parsed.length, 'endpoints');
+        setEndpoints(parsed);
+      } else {
+        console.log('[Dashboard] No endpoints found in localStorage');
       }
     };
     
@@ -192,7 +217,7 @@ export default function DashboardPage() {
       case 'endpoints':
         return <MyAPIs onNavigateToTester={() => {
           setTesterKey(prev => prev + 1);
-          setCurrentView('tester');
+          navigateToView('tester');
         }} />;
       case 'api-keys':
         return (
@@ -378,23 +403,91 @@ export default function DashboardPage() {
                               onClick={async () => {
                                 setTestingKey(key.id);
                                 setTestResult(null);
+                                
+                                console.log('[API Key Test] Available endpoints:', endpoints.length, endpoints);
 
                                 // Find an endpoint to test with
                                 let testEndpoint;
                                 if (key.allowedEndpoints && key.allowedEndpoints.length > 0) {
                                   testEndpoint = endpoints.find(ep => key.allowedEndpoints.includes(ep.id));
                                 } else {
-                                  testEndpoint = endpoints.find(ep => ep.method === 'GET');
+                                  // Prefer GET endpoints without :id, fallback to any GET endpoint
+                                  testEndpoint = endpoints.find(ep => ep.method === 'GET' && !ep.path.includes(':id'));
+                                  if (!testEndpoint) {
+                                    testEndpoint = endpoints.find(ep => ep.method === 'GET');
+                                  }
                                 }
 
                                 if (!testEndpoint) {
                                   setTestResult({
                                     keyId: key.id,
                                     success: false,
-                                    message: 'No endpoints available to test with. Create a GET endpoint first!'
+                                    message: 'ℹ️ No GET endpoint available to test with. Your API key will still work for POST/PUT/DELETE endpoints - we just need a GET endpoint for safe testing!'
                                   });
                                   setTestingKey(null);
                                   return;
+                                }
+                                
+                                // Replace :id with real ID by creating a test record first
+                                let testPath = testEndpoint.path;
+                                if (testPath.includes(':id')) {
+                                  // Create a test record to get a valid ID
+                                  try {
+                                    const createPath = testPath.replace(/\/:[^/]+$/, '');
+                                    const testData: any = {};
+                                    const timestamp = Date.now();
+                                    
+                                    if (testEndpoint.columns) {
+                                      testEndpoint.columns.forEach((col: any) => {
+                                        if (col.primaryKey || col.name === 'id') return;
+                                        const colType = col.type?.toLowerCase() || '';
+                                        const colName = col.name?.toLowerCase() || '';
+                                        
+                                        if (colType.includes('int')) {
+                                          testData[col.name] = 1;
+                                        } else if (colType.includes('bool')) {
+                                          testData[col.name] = true;
+                                        } else if (colType.includes('date') || colType.includes('time')) {
+                                          testData[col.name] = new Date().toISOString().split('T')[0];
+                                        } else if (colName.includes('email')) {
+                                          testData[col.name] = `test${timestamp}@example.com`;
+                                        } else if (colName.includes('username') || colName.includes('user_name')) {
+                                          testData[col.name] = `user${timestamp}`;
+                                        } else if (colName.includes('phone')) {
+                                          testData[col.name] = `555${timestamp.toString().slice(-7)}`;
+                                        } else {
+                                          testData[col.name] = `Example ${col.name} ${timestamp}`;
+                                        }
+                                      });
+                                      
+                                      const createResponse = await fetch(`${window.location.origin}${createPath}`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'x-db-type': testEndpoint.database?.type || 'sqlite',
+                                          'x-connection-id': testEndpoint.database?.id || testEndpoint.database?.filePath || ''
+                                        },
+                                        body: JSON.stringify(testData)
+                                      });
+                                      
+                                      if (createResponse.ok) {
+                                        const createResult = await createResponse.json();
+                                        const newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                                        if (newId) {
+                                          testPath = testPath.replace(':id', String(newId));
+                                        } else {
+                                          testPath = testPath.replace(':id', '1');
+                                        }
+                                      } else {
+                                        testPath = testPath.replace(':id', '1');
+                                      }
+                                    } else {
+                                      testPath = testPath.replace(':id', '1');
+                                    }
+                                  } catch (err) {
+                                    console.error('Failed to create test record for API key test:', err);
+                                    testPath = testPath.replace(':id', '1');
+                                  }
                                 }
 
                                 try {
@@ -407,20 +500,14 @@ export default function DashboardPage() {
                                   // Add database headers if endpoint has database info
                                   if (testEndpoint.database) {
                                     headers['x-db-type'] = testEndpoint.database.type;
+                                    headers['x-connection-id'] = testEndpoint.database.id || testEndpoint.database.filePath;
                                     if (testEndpoint.database.connectionString) {
                                       headers['x-db-connection'] = testEndpoint.database.connectionString;
                                     }
-                                    if (testEndpoint.database.filePath && testEndpoint.database.type === 'sqlite') {
-                                      // Get SQLite file data from IndexedDB
-                                      const dbData = await getDatabaseFile(testEndpoint.database.filePath);
-                                      if (dbData) {
-                                        const base64 = btoa(String.fromCharCode(...dbData));
-                                        headers['x-db-file'] = base64;
-                                      }
-                                    }
+                                    // Note: SQLite operations are handled server-side, no need to send file data
                                   }
                                   
-                                  const response = await fetch(`${window.location.origin}${testEndpoint.path}`, {
+                                  const response = await fetch(`${window.location.origin}${testPath}`, {
                                     method: testEndpoint.method,
                                     headers
                                   });
@@ -550,7 +637,7 @@ export default function DashboardPage() {
           databases={databases} 
           endpoints={endpoints} 
           user={user} 
-          onViewChange={(view: string) => setCurrentView(view as ViewType)} 
+          onViewChange={(view: string) => navigateToView(view as ViewType)} 
         />;
     }
   };
@@ -626,7 +713,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => {
                       setProfileMenuOpen(false);
-                      setCurrentView('settings');
+                      navigateToView('settings');
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                   >
@@ -668,8 +755,7 @@ export default function DashboardPage() {
               <button
                 key={item.id}
                 onClick={() => {
-                  setCurrentView(item.id as ViewType);
-                  localStorage.setItem('dashboardView', item.id);
+                  navigateToView(item.id as ViewType);
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
@@ -689,6 +775,18 @@ export default function DashboardPage() {
       {/* Main Content */}
       <div className="lg:ml-64 pt-16">
         <main className="p-6">
+          {/* Back Button */}
+          {viewHistory.length > 0 && (
+            <button
+              onClick={goBack}
+              className="mb-4 flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back
+            </button>
+          )}
           {renderCurrentView()}
         </main>
       </div>

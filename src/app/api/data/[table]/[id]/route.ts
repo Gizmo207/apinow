@@ -123,7 +123,30 @@ export async function GET(
       }
     }
 
-    // SQLite fallback
+    // SQLite with connection ID
+    if (dbType === 'sqlite' && connectionId) {
+      const dbPath = join(process.cwd(), 'uploads', connectionId);
+      console.log('[GET][SQLite] Looking for:', dbPath, '| Exists?', existsSync(dbPath));
+      
+      if (!existsSync(dbPath)) {
+        return NextResponse.json({
+          error: 'Database file not found',
+          details: `SQLite file ${connectionId} does not exist at ${dbPath}`
+        }, { status: 404 });
+      }
+
+      const db = new Database(dbPath, { readonly: true });
+      const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+      db.close();
+
+      if (!row) {
+        return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({ data: row });
+    }
+    
+    // SQLite fallback (legacy - no connection ID)
     if (dbType === 'sqlite' || !dbType) {
       const dbPath = getLatestDbFile();
       if (!dbPath) {
@@ -285,7 +308,43 @@ export async function PUT(
       }
     }
 
-    // SQLite fallback
+    // SQLite with connection ID
+    if (dbType === 'sqlite' && connectionId) {
+      const dbPath = join(process.cwd(), 'uploads', connectionId);
+      
+      if (!existsSync(dbPath)) {
+        return NextResponse.json({
+          error: 'Database file not found',
+          details: `SQLite file ${connectionId} does not exist`
+        }, { status: 404 });
+      }
+
+      const db = new Database(dbPath, { readonly: false });
+      
+      try {
+        const updates = columns.map(col => `${col} = ?`).join(', ');
+        const values = [...Object.values(body), id];
+        const query = `UPDATE ${table} SET ${updates} WHERE id = ?`;
+        const result = db.prepare(query).run(...values);
+        db.close();
+        
+        if (result.changes === 0) {
+          return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+        }
+        
+        return NextResponse.json({ 
+          success: true, 
+          changes: result.changes,
+          message: 'Record updated successfully' 
+        });
+      } catch (err: any) {
+        try { db.close(); } catch {}
+        console.error('[API /data/[table]/[id] PUT][sqlite] error:', err?.message || err);
+        return NextResponse.json({ error: 'Update error', details: err?.message }, { status: 500 });
+      }
+    }
+    
+    // SQLite fallback (legacy)
     if (dbType === 'sqlite' || !dbType) {
       const dbPath = getLatestDbFile();
       if (!dbPath) {
@@ -441,7 +500,41 @@ export async function DELETE(
       }
     }
 
-    // SQLite fallback
+    // SQLite with connection ID
+    if (dbType === 'sqlite' && connectionId) {
+      const dbPath = join(process.cwd(), 'uploads', connectionId);
+      
+      if (!existsSync(dbPath)) {
+        return NextResponse.json({
+          error: 'Database file not found',
+          details: `SQLite file ${connectionId} does not exist`
+        }, { status: 404 });
+      }
+
+      const db = new Database(dbPath, { readonly: false });
+      
+      try {
+        const query = `DELETE FROM ${table} WHERE id = ?`;
+        const result = db.prepare(query).run(id);
+        db.close();
+        
+        if (result.changes === 0) {
+          return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+        }
+        
+        return NextResponse.json({ 
+          success: true, 
+          changes: result.changes,
+          message: 'Record deleted successfully' 
+        });
+      } catch (err: any) {
+        try { db.close(); } catch {}
+        console.error('[API /data/[table]/[id] DELETE][sqlite] error:', err?.message || err);
+        return NextResponse.json({ error: 'Delete error', details: err?.message }, { status: 500 });
+      }
+    }
+    
+    // SQLite fallback (legacy)
     if (dbType === 'sqlite' || !dbType) {
       const dbPath = getLatestDbFile();
       if (!dbPath) {

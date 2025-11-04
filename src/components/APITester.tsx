@@ -42,12 +42,98 @@ export function APITester() {
           setSelectedEndpoint(endpointId);
           console.log('Selected endpoint:', matchingEndpoint);
           
-          // Process URL - replace :id with actual value
+          // Process URL - replace :id with actual value from database
           let processedUrl = url;
           if (processedUrl && processedUrl.includes(':id')) {
-            processedUrl = processedUrl.replace(':id', '1');
+            // Always create a fresh test record first to ensure we have a valid ID
+            (async () => {
+              try {
+                const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+                
+                // Generate test data from schema with unique values
+                if (matchingEndpoint.columns) {
+                  const testData: any = {};
+                  const timestamp = Date.now();
+                  matchingEndpoint.columns.forEach((col: any) => {
+                    if (col.primaryKey || col.name === 'id') return;
+                    const colType = col.type?.toLowerCase() || '';
+                    const colName = col.name?.toLowerCase() || '';
+                    
+                    if (colType.includes('int')) {
+                      testData[col.name] = 1;
+                    } else if (colType.includes('bool')) {
+                      testData[col.name] = true;
+                    } else if (colType.includes('date') || colType.includes('time')) {
+                      testData[col.name] = new Date().toISOString().split('T')[0];
+                    } else if (colName.includes('email')) {
+                      testData[col.name] = `test${timestamp}@example.com`;
+                    } else if (colName.includes('username') || colName.includes('user_name')) {
+                      testData[col.name] = `user${timestamp}`;
+                    } else if (colName.includes('phone')) {
+                      testData[col.name] = `555${timestamp.toString().slice(-7)}`;
+                    } else {
+                      testData[col.name] = `Example ${col.name} ${timestamp}`;
+                    }
+                  });
+                  
+                  console.log('[Auto-fill] Creating test record with data:', testData);
+                  
+                  // Create the record directly (no need for saved POST endpoint)
+                  const createPath = matchingEndpoint.path.replace(/\/:[^/]+$/, ''); // Remove /:id from path
+                  const createResponse = await fetch(`${origin}${createPath}`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-db-type': matchingEndpoint.database?.type || 'sqlite',
+                      'x-connection-id': matchingEndpoint.database?.id || ''
+                    },
+                    body: JSON.stringify(testData)
+                  });
+                  
+                  const createResult = await createResponse.json();
+                  console.log('[Auto-fill] Create response:', createResult);
+                  
+                  const newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                  console.log('[Auto-fill] Extracted ID:', newId);
+                  
+                  if (newId) {
+                    setUrl(processedUrl.replace(':id', String(newId)));
+                    console.log('[Auto-fill] Using new ID:', newId);
+                    return;
+                  }
+                }
+                
+                // Fallback: try to get existing ID
+                const listEndpoint = savedEndpoints.find(
+                  ep => ep.table === matchingEndpoint.table && ep.method === 'GET' && !ep.path.includes(':id')
+                );
+                
+                if (listEndpoint) {
+                  const response = await fetch(`${origin}${listEndpoint.path}`, {
+                    headers: {
+                      'x-db-type': matchingEndpoint.database?.type || 'sqlite',
+                      'x-connection-id': matchingEndpoint.database?.id || ''
+                    }
+                  });
+                  const data = await response.json();
+                  const firstRecord = data.data?.[0] || data[0];
+                  const realId = firstRecord?.id;
+                  if (realId) {
+                    setUrl(processedUrl.replace(':id', String(realId)));
+                    return;
+                  }
+                }
+                
+                // Last resort
+                setUrl(processedUrl.replace(':id', '1'));
+              } catch (err) {
+                console.error('Failed to get valid ID:', err);
+                setUrl(processedUrl.replace(':id', '1'));
+              }
+            })();
+          } else {
+            setUrl(processedUrl);
           }
-          setUrl(processedUrl);
           console.log('Set URL:', processedUrl);
           
           // Set method
@@ -59,6 +145,7 @@ export function APITester() {
           // Auto-fill body for POST/PUT requests with table schema
           if ((method === 'POST' || method === 'PUT') && matchingEndpoint.columns && matchingEndpoint.columns.length > 0) {
             const exampleBody: any = {};
+            const timestamp = Date.now();
             matchingEndpoint.columns.forEach((col: any) => {
               // Skip auto-increment primary keys
               if (col.primaryKey && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial') || col.name === 'id')) {
@@ -67,14 +154,22 @@ export function APITester() {
               
               // Generate example values based on column type
               const colType = col.type?.toLowerCase() || '';
+              const colName = col.name?.toLowerCase() || '';
+              
               if (colType.includes('int') || colType.includes('number')) {
                 exampleBody[col.name] = 1;
               } else if (colType.includes('bool')) {
                 exampleBody[col.name] = true;
               } else if (colType.includes('date') || colType.includes('time')) {
                 exampleBody[col.name] = new Date().toISOString().split('T')[0];
+              } else if (colName.includes('email')) {
+                exampleBody[col.name] = `test${timestamp}@example.com`;
+              } else if (colName.includes('username') || colName.includes('user_name')) {
+                exampleBody[col.name] = `user${timestamp}`;
+              } else if (colName.includes('phone')) {
+                exampleBody[col.name] = `555${timestamp.toString().slice(-7)}`;
               } else {
-                exampleBody[col.name] = `Example ${col.name}`;
+                exampleBody[col.name] = `Example ${col.name} ${timestamp}`;
               }
             });
             setBody(JSON.stringify(exampleBody, null, 2));

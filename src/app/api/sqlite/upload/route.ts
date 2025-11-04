@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
       await mkdir(uploadsDir, { recursive: true });
     }
 
-    // Save file
-    const filename = `${Date.now()}-${file.name}`;
+    // Save file (use the filename as-is, it's already formatted correctly)
+    const filename = file.name;
     const filepath = join(uploadsDir, filename);
     
     const bytes = await file.arrayBuffer();

@@ -1,12 +1,13 @@
 // Browser-side SQLite storage - files stay in browser, queries go to server
 
-// Store SQLite file in IndexedDB (browser storage)
+// Store SQLite file in IndexedDB (browser storage) AND upload to server
 export async function storeSQLiteFile(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
   const dbId = `sqlite_${Date.now()}_${file.name}`;
   
-  return new Promise((resolve, reject) => {
+  // First, store in IndexedDB
+  await new Promise((resolve, reject) => {
     const request = indexedDB.open('SQLiteDatabases', 1);
     
     request.onerror = () => reject(request.error);
@@ -27,12 +28,28 @@ export async function storeSQLiteFile(file: File): Promise<string> {
       
       transaction.oncomplete = () => {
         db.close();
-        resolve(dbId);
+        resolve(null);
       };
       
       transaction.onerror = () => reject(transaction.error);
     };
   });
+  
+  // Then, upload to server with the same ID as filename
+  const formData = new FormData();
+  const renamedFile = new File([file], dbId, { type: file.type });
+  formData.append('file', renamedFile);
+  
+  const response = await fetch('/api/sqlite/upload', {
+    method: 'POST',
+    body: formData
+  });
+  
+  if (!response.ok) {
+    console.error('Failed to upload SQLite file to server');
+  }
+  
+  return dbId;
 }
 
 // Get database file data from IndexedDB
