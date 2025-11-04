@@ -40,8 +40,15 @@ export async function storeSQLiteFile(file: File): Promise<string> {
   const renamedFile = new File([file], dbId, { type: file.type });
   formData.append('file', renamedFile);
   
+  // Get auth headers (same pattern as other API calls)
+  const authUserRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+  const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+  const headers: Record<string, string> = {};
+  if (authUser?.uid) headers['x-user-id'] = authUser.uid;
+  
   const response = await fetch('/api/sqlite/upload', {
     method: 'POST',
+    headers,
     body: formData
   });
   
