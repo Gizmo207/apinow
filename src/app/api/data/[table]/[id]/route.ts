@@ -102,6 +102,43 @@ export async function GET(
         }
       }
 
+      if (dbType === 'googlesheets') {
+        // Google Sheets: Get row by ID
+        try {
+          const { getSheetData, sheetDataToJSON } = await import('@/lib/googleSheets');
+          const sheetId = cfg.connectionString;
+          if (!sheetId) {
+            return NextResponse.json({ error: 'Sheet ID not found' }, { status: 500 });
+          }
+          
+          const rawData = await getSheetData(sheetId, table);
+          if (!rawData || rawData.length === 0) {
+            return NextResponse.json({ error: 'Sheet is empty' }, { status: 404 });
+          }
+          
+          const jsonData = sheetDataToJSON(rawData);
+          console.log('[GoogleSheets GET by ID] Looking for ID:', id, 'in', jsonData.length, 'rows');
+          console.log('[GoogleSheets GET by ID] First row:', jsonData[0]);
+          
+          const row = jsonData.find((r: any) => String(r.ID) === String(id) || String(r.id) === String(id));
+          
+          if (!row) {
+            const availableIds = jsonData.map((r: any) => r.ID || r.id);
+            console.log('[GoogleSheets GET by ID] No match. Available IDs:', availableIds);
+            return NextResponse.json({ 
+              error: 'Record not found', 
+              debug: { searchedFor: id, availableIds: availableIds.slice(0, 10) }
+            }, { status: 404 });
+          }
+          
+          return NextResponse.json({ data: row });
+        } catch (err: any) {
+          console.error('[API /data/[table]/[id] GET][googlesheets] error:', err?.message || err);
+          console.error('[API /data/[table]/[id] GET][googlesheets] stack:', err?.stack);
+          return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
+        }
+      }
+
       if (dbType === 'mongodb') {
         const { MongoClient, ObjectId } = require('mongodb');
         const client = new MongoClient(cfg.connectionString);
@@ -371,10 +408,17 @@ export async function PUT(
           
           const headers = rawData[0];
           const jsonData = sheetDataToJSON(rawData);
+          console.log('[GoogleSheets PUT by ID] Looking for ID:', id, 'in', jsonData.length, 'rows');
+          console.log('[GoogleSheets PUT by ID] First row:', jsonData[0]);
           const rowIndex = jsonData.findIndex((r: any) => String(r.ID) === String(id) || String(r.id) === String(id));
           
           if (rowIndex === -1) {
-            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+            const availableIds = jsonData.map((r: any) => r.ID || r.id);
+            console.log('[GoogleSheets PUT by ID] No match. Available IDs:', availableIds);
+            return NextResponse.json({ 
+              error: 'Record not found',
+              debug: { searchedFor: id, availableIds: availableIds.slice(0, 10) }
+            }, { status: 404 });
           }
           
           // Merge existing data with updates
@@ -669,10 +713,17 @@ export async function DELETE(
           }
           
           const jsonData = sheetDataToJSON(rawData);
+          console.log('[GoogleSheets DELETE by ID] Looking for ID:', id, 'in', jsonData.length, 'rows');
+          console.log('[GoogleSheets DELETE by ID] First row sample:', jsonData[0]);
+          
           const rowIndex = jsonData.findIndex((r: any) => String(r.ID) === String(id) || String(r.id) === String(id));
           
           if (rowIndex === -1) {
-            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+            console.log('[GoogleSheets DELETE by ID] No match found. Available IDs:', jsonData.map((r: any) => r.ID || r.id));
+            return NextResponse.json({ 
+              error: 'Record not found', 
+              debug: { searchedFor: id, availableIds: jsonData.map((r: any) => r.ID || r.id).slice(0, 10) }
+            }, { status: 404 });
           }
           
           // Delete from Google Sheets (row index + 2 because: 1 for 1-based indexing, 1 for header row)
