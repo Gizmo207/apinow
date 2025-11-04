@@ -386,8 +386,12 @@ export async function POST(
         
         try {
           const pool = await sql.connect(config);
-          const columns = Object.keys(body);
-          const values = Object.values(body);
+          // Filter out 'id' and other identity columns for MSSQL
+          const bodyWithoutId = { ...body };
+          delete bodyWithoutId.id; // Remove id to avoid IDENTITY_INSERT error
+          
+          const columns = Object.keys(bodyWithoutId);
+          const values = Object.values(bodyWithoutId);
           const placeholders = values.map((_, i) => `@param${i}`).join(', ');
           const columnsList = columns.join(', ');
           const query = `INSERT INTO ${table} (${columnsList}) OUTPUT INSERTED.* VALUES (${placeholders})`;

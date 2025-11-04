@@ -324,11 +324,22 @@ export async function PUT(
         }
         try {
           const pool = await sql.connect(config);
-          const setClauses = columns.map((col, i) => `${col} = @param${i}`).join(', ');
+          // Filter out 'id' from update columns for MSSQL (can't update IDENTITY columns)
+          const bodyWithoutId = { ...body };
+          delete bodyWithoutId.id;
+          
+          const updateColumns = Object.keys(bodyWithoutId);
+          const updateValues = Object.values(bodyWithoutId);
+          
+          if (updateColumns.length === 0) {
+            return NextResponse.json({ error: 'No fields to update (id cannot be updated)' }, { status: 422 });
+          }
+          
+          const setClauses = updateColumns.map((col, i) => `${col} = @param${i}`).join(', ');
           const query = `UPDATE ${table} SET ${setClauses} OUTPUT INSERTED.* WHERE id = @id`;
           const preparedRequest = pool.request();
           preparedRequest.input('id', id);
-          Object.values(body).forEach((val, i) => {
+          updateValues.forEach((val, i) => {
             preparedRequest.input(`param${i}`, val);
           });
           const result = await preparedRequest.query(query);
