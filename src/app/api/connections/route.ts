@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Allowed engines we can accept via this create endpoint
-const ALLOWED_ENGINES = new Set(['postgresql', 'mysql', 'mariadb', 'mongodb', 'mssql', 'redis']);
+const ALLOWED_ENGINES = new Set(['postgresql', 'mysql', 'mariadb', 'mongodb', 'mssql']);
 
 function parseBoolean(val: any, fallback = false): boolean {
   if (typeof val === 'boolean') return val;
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         ssl: ssl === undefined ? true : !!ssl
       };
     } else {
-      // For other engines (mysql, mariadb, mongodb, mssql, redis):
+      // For other engines (mysql, mariadb, mongodb, mssql):
       const connectionString = sanitizeString(body.connectionString);
       if (!connectionString) {
         return NextResponse.json({ error: 'Missing connectionString for this engine' }, { status: 422 });
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
           database,
         };
       } else {
-        // Persist as-is for now (mssql/redis)
+        // Persist as-is for now (mssql)
         docData = {
           ...docData,
           connectionString,

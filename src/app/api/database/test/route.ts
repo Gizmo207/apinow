@@ -53,10 +53,6 @@ export async function POST(request: NextRequest) {
         testResult = await testMSSQL(connectionString);
         break;
       
-      case 'redis':
-        testResult = await testRedis(connectionString);
-        break;
-      
       default:
         return NextResponse.json(
           { status: 'error', error: `Unsupported engine: ${engine}` },
@@ -227,28 +223,6 @@ async function testMSSQL(connectionString: string) {
   };
 }
 
-// Redis test
-async function testRedis(connectionString: string) {
-  const { createClient } = require('redis');
-  
-  const client = createClient({
-    url: connectionString,
-    socket: { connectTimeout: 5000 },
-  });
-  
-  await client.connect();
-  const pong = await client.ping();
-  await client.disconnect();
-  
-  return {
-    status: 'ok',
-    message: 'Connection successful',
-    details: {
-      command: 'PING',
-      response: pong,
-    }
-  };
-}
 
 // Classify error type for better debugging
 function classifyError(error: any): string {
@@ -283,7 +257,7 @@ function getSuggestions(error: any): string[] {
     ],
     connection_refused: [
       'Database server may be down',
-      'Check if the port is correct (MySQL: 3306, PostgreSQL: 5432, MongoDB: 27017, MSSQL: 1433, Redis: 6379)',
+      'Check if the port is correct (MySQL: 3306, PostgreSQL: 5432, MongoDB: 27017, MSSQL: 1433)',
       'Verify firewall allows inbound connections',
     ],
     auth_error: [
