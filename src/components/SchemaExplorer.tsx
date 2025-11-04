@@ -144,6 +144,15 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
             query: `SELECT * FROM ${table.name} LIMIT 100`
           })
         });
+      } else if (selectedDb.type === 'mssql') {
+        res = await fetch('/api/mssql/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connectionId: selectedDb.id,
+            query: `SELECT TOP 100 * FROM ${table.name}`
+          })
+        });
       } else if (selectedDb.type === 'postgresql') {
         res = await fetch('/api/postgresql/query', {
           method: 'POST',

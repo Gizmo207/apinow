@@ -70,6 +70,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Add connection timeout and retry settings
+    config.options = {
+      encrypt: config.encrypt !== false,
+      trustServerCertificate: config.trustServerCertificate || false,
+      enableArithAbort: true,
+    };
+    config.connectionTimeout = 30000; // 30 seconds
+    config.requestTimeout = 30000;
+    
     console.log('[MSSQL Connect] Config:', { ...config, password: '***' });
 
     // Create connection pool

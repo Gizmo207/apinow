@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
+import { getConnectionConfig } from '@/lib/getConnectionConfig';
+import { getCurrentUserId } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const { connectionString, query } = await request.json();
+    const body = await request.json();
+    const connectionId = body?.connectionId as string | undefined;
+    const connectionString = body?.connectionString as string | undefined;
+    const query = body?.query as string;
 
-    if (!connectionString) {
+    if (!connectionId && !connectionString) {
       return NextResponse.json(
-        { error: 'Connection string is required' },
+        { error: 'Missing connectionId or connectionString' },
         { status: 400 }
       );
     }
@@ -23,9 +28,29 @@ export async function POST(request: NextRequest) {
 
     console.log('[MSSQL Query] Executing query...');
 
+    let finalConnectionString = connectionString;
+
+    // If connectionId provided, fetch connection string securely
+    if (connectionId) {
+      const cfg = await getConnectionConfig(connectionId);
+      if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+      const requesterId = getCurrentUserId(request);
+      if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      finalConnectionString = cfg.connectionString;
+    }
+
+    if (!finalConnectionString) {
+      return NextResponse.json(
+        { error: 'Connection string is required' },
+        { status: 400 }
+      );
+    }
+
     // Parse connection string into config object
     const config: any = {};
-    const parts = connectionString.split(';');
+    const parts = finalConnectionString.split(';');
     
     for (const part of parts) {
       const [key, value] = part.split('=');
@@ -51,6 +76,15 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    // Add connection timeout and retry settings
+    config.options = {
+      encrypt: config.encrypt !== false,
+      trustServerCertificate: config.trustServerCertificate || false,
+      enableArithAbort: true,
+    };
+    config.connectionTimeout = 30000;
+    config.requestTimeout = 30000;
 
     // Create connection pool
     const pool = await sql.connect(config);
