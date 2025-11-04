@@ -72,6 +72,12 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           headers,
           body: JSON.stringify({ connectionId: selectedDb.id })
         });
+      } else if (selectedDb.type === 'mssql') {
+        res = await fetch('/api/mssql/connect', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
+        });
       } else {
         alert('Database type not yet supported');
         return;
@@ -90,8 +96,8 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       const tablesList = data.tables || [];
       console.log('Tables list:', tablesList);
       
-      // Convert MySQL, MariaDB, PostgreSQL, and MongoDB tables to the format expected
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb') {
+      // Convert MySQL, MariaDB, PostgreSQL, MongoDB, and MSSQL tables to the format expected
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb' || selectedDb.type === 'mssql') {
         const formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []

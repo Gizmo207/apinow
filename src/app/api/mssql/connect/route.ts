@@ -1,24 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from 'mssql';
+import { getConnectionConfig } from '@/lib/getConnectionConfig';
+import { getCurrentUserId } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const { connectionString } = await request.json();
+    const body = await request.json();
+    const connectionId = body?.connectionId as string | undefined;
+    const connectionString = body?.connectionString as string | undefined;
 
-    if (!connectionString) {
+    if (!connectionId && !connectionString) {
       return NextResponse.json(
-        { error: 'Connection string is required' },
+        { error: 'Missing connectionId or connectionString' },
         { status: 400 }
       );
     }
 
     console.log('[MSSQL Connect] Attempting connection...');
 
+    let finalConnectionString = connectionString;
+
+    // If connectionId provided, fetch connection string securely
+    if (connectionId) {
+      const cfg = await getConnectionConfig(connectionId);
+      if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+      const requesterId = getCurrentUserId(request);
+      if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      finalConnectionString = cfg.connectionString;
+    }
+
+    if (!finalConnectionString) {
+      return NextResponse.json(
+        { error: 'Connection string is required' },
+        { status: 400 }
+      );
+    }
+
     // Parse connection string into config object
     const config: any = {};
-    const parts = connectionString.split(';');
+    const parts = finalConnectionString.split(';');
     
     for (const part of parts) {
       const [key, value] = part.split('=');

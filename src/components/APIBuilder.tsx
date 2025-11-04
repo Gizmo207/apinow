@@ -76,8 +76,16 @@ export function APIBuilder({ databases }: APIBuilderProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ connectionId: selectedDb.id })
         });
+      } else if (selectedDb.type === 'mssql') {
+        res = await fetch('/api/mssql/connect', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
+        });
       } else {
-        alert('Database type not yet supported');
+        setTables([]);
+        alert('Database type not yet supported in Endpoint Builder');
+        setLoading(false);
         return;
       }
 
@@ -87,7 +95,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       const tablesList = data.tables || [];
       
       let formattedTables;
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb' || selectedDb.type === 'mssql') {
         formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []

@@ -5,14 +5,8 @@ export type Engine =
   | 'mysql' 
   | 'postgresql'
   | 'mongodb' 
-  | 'redis' 
   | 'mssql' 
-  | 'mariadb' 
-  | 'cassandra' 
-  | 'dynamodb' 
-  | 'neo4j' 
-  | 'elasticsearch' 
-  | 'couchbase';
+  | 'mariadb';
 
 export type FieldType = 
   | 'text' 

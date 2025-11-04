@@ -78,8 +78,8 @@ export async function getConnectionConfig(connectionId: string): Promise<Connect
     else portRaw = 5432;
   }
 
-  // For MongoDB, return connectionString directly
-  if (type === 'mongodb') {
+  // For MongoDB and MSSQL, return connectionString directly
+  if (type === 'mongodb' || type === 'mssql') {
     const connectionString = data.connectionString;
     if (!connectionString) return null;
     return { 
