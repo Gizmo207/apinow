@@ -2,22 +2,26 @@ import { ProviderConfig } from './types';
 
 export const GOOGLESHEETS_PROVIDERS: ProviderConfig[] = [
   {
-    key: 'googlesheets-public',
+    key: 'googlesheets-service',
     engine: 'googlesheets',
-    name: 'Google Sheets (Public URL)',
+    name: 'Google Sheets (Full CRUD)',
     helpSteps: [
-      '📊 Share your Google Sheet as "Anyone with the link can view"',
-      '🔗 Copy the full Google Sheets URL',
-      '✅ Paste the URL below',
+      '📊 STEP 1: Open your Google Sheet',
+      '🔗 STEP 2: Click the "Share" button (top right)',
+      '✍️ STEP 3: Add this email as Editor:',
+      '   firebase-adminsdk-fbsvc@api-now-bd858.iam.gserviceaccount.com',
       '',
-      '📖 Mode: READ-ONLY (standard for shared sheets)',
-      '✏️ Perfect for: Dynamic content, pricing tables, product catalogs',
+      '⚠️ IMPORTANT: Give "Editor" permission (not just Viewer)',
       '',
-      '💡 How to get the URL:',
-      '1. Open your Google Sheet',
-      '2. Click Share → Get link',
-      '3. Set to "Anyone with the link can view"',
-      '4. Copy the full URL',
+      '📋 STEP 4: Copy your Google Sheets URL and paste below',
+      '',
+      '✅ You\'ll get FULL CRUD operations:',
+      '   • GET - Read all data',
+      '   • POST - Insert new rows',
+      '   • PUT - Update existing rows',
+      '   • DELETE - Remove rows',
+      '',
+      '🔒 Security: Only YOUR account can access this connection',
     ],
     fields: [
       {

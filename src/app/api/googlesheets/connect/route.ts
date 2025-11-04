@@ -1,41 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { extractSheetId, getSheetMetadata, getSheetData, sheetDataToJSON } from '@/lib/googleSheets';
 
 export const runtime = 'nodejs';
-
-// Helper to extract sheet ID from URL
-function extractSheetId(url: string): string | null {
-  const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-  return match ? match[1] : null;
-}
-
-// Helper to fetch sheet data as CSV
-async function fetchSheetData(sheetId: string): Promise<string> {
-  // Use Google's CSV export endpoint (works for public sheets)
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-  
-  const response = await fetch(csvUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch sheet: ${response.statusText}`);
-  }
-  
-  return await response.text();
-}
-
-// Parse CSV to get schema info
-function parseCSVSchema(csv: string) {
-  const lines = csv.split('\n').filter(line => line.trim());
-  if (lines.length === 0) {
-    throw new Error('Empty sheet');
-  }
-  
-  // First line is headers
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  
-  return {
-    columns: headers,
-    rowCount: lines.length - 1
-  };
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,21 +30,32 @@ export async function POST(request: NextRequest) {
       sheetId = extracted;
     }
     
-    // Try to fetch the sheet
-    const csvData = await fetchSheetData(sheetId);
-    const schema = parseCSVSchema(csvData);
+    // Try to fetch sheet metadata and data using service account
+    const metadata = await getSheetMetadata(sheetId);
+    const sheets = metadata.sheets || [];
+    const firstSheetName = sheets[0]?.properties?.title || 'Sheet1';
+    
+    // Get data from first sheet
+    const data = await getSheetData(sheetId, firstSheetName);
+    const headers = data[0] || [];
+    const rowCount = data.length - 1;
     
     console.log('[Google Sheets Connect] Connection successful:', {
       sheetId,
-      columns: schema.columns.length,
-      rows: schema.rowCount
+      sheetName: firstSheetName,
+      columns: headers.length,
+      rows: rowCount
     });
     
     return NextResponse.json({
       success: true,
-      message: `Connected successfully! Found ${schema.columns.length} columns and ${schema.rowCount} rows`,
+      message: `Connected successfully! Found ${headers.length} columns and ${rowCount} rows`,
       sheetId,
-      schema,
+      sheetName: firstSheetName,
+      schema: {
+        columns: headers,
+        rowCount
+      },
     });
     
   } catch (error: any) {
@@ -88,11 +65,11 @@ export async function POST(request: NextRequest) {
     let helpText = '';
     
     if (error.message.includes('404') || error.message.includes('Not Found')) {
-      errorMessage = 'Sheet not found or not accessible';
-      helpText = 'Make sure the sheet is set to "Anyone with the link can view"';
+      errorMessage = 'Sheet not found';
+      helpText = 'Double-check the URL and make sure the sheet exists';
     } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-      errorMessage = 'Permission denied';
-      helpText = 'Sheet must be publicly accessible. Go to Share → Get link → Anyone with the link can view';
+      errorMessage = 'Permission denied - Service account not shared';
+      helpText = 'Share your Google Sheet with: firebase-adminsdk-fbsvc@api-now-bd858.iam.gserviceaccount.com (Editor permission)';
     }
     
     return NextResponse.json(

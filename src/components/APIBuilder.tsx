@@ -116,7 +116,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
 
   const generateAvailableEndpoints = (tablesList: any[]) => {
     const allEndpoints: any[] = [];
-    const isReadOnly = selectedDb.type === 'sqlite' || selectedDb.type === 'googlesheets';
+    const isReadOnly = selectedDb.type === 'sqlite'; // Only SQLite is read-only now!
     
     tablesList.forEach(table => {
       // GET all (available for all database types)
@@ -254,9 +254,14 @@ export function APIBuilder({ databases }: APIBuilderProps) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{db.name}</h3>
-                    {(db.type === 'sqlite' || db.type === 'googlesheets') && (
+                    {db.type === 'sqlite' && (
                       <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">
                         READ-ONLY
+                      </span>
+                    )}
+                    {db.type === 'googlesheets' && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded">
+                        FULL CRUD
                       </span>
                     )}
                   </div>
@@ -274,20 +279,37 @@ export function APIBuilder({ databases }: APIBuilderProps) {
           <h2 className="text-lg font-semibold mb-4">Available Endpoints</h2>
           
           {/* Read-Only Database Info */}
-          {(selectedDb.type === 'sqlite' || selectedDb.type === 'googlesheets') && (
+          {selectedDb.type === 'sqlite' && (
             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex gap-2">
                 <span className="text-blue-600 text-lg">ℹ️</span>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900 mb-1">
-                    {selectedDb.type === 'sqlite' ? 'SQLite' : 'Google Sheets'} Production Mode: Read-Only
-                  </p>
+                  <p className="text-sm font-medium text-blue-900 mb-1">SQLite Production Mode: Read-Only</p>
                   <p className="text-sm text-blue-700">
-                    Only GET (read) endpoints are available. This is industry standard for {selectedDb.type === 'sqlite' ? 'SQLite in production environments' : 'shared Google Sheets'}. 
-                    Write operations (POST/PUT/DELETE) are not supported.
+                    Only GET (read) endpoints are available. This is industry standard for SQLite in production environments. 
+                    Write operations (POST/PUT/DELETE) are not supported on blob storage.
                   </p>
                   <p className="text-xs text-blue-600 mt-2">
-                    Need write operations? Use PostgreSQL, MySQL, MongoDB, or MSSQL instead.
+                    Need write operations? Use PostgreSQL, MySQL, MongoDB, MSSQL, or Google Sheets instead.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Google Sheets Full CRUD Info */}
+          {selectedDb.type === 'googlesheets' && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex gap-2">
+                <span className="text-green-600 text-lg">✅</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-900 mb-1">Google Sheets: Full CRUD Support!</p>
+                  <p className="text-sm text-green-700">
+                    All operations available: GET, POST, PUT, DELETE. 
+                    Your spreadsheet becomes a powerful, collaborative database with real-time updates!
+                  </p>
+                  <p className="text-xs text-green-600 mt-2">
+                    💡 Edit data in Google Sheets OR via API - changes sync instantly!
                   </p>
                 </div>
               </div>

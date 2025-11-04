@@ -1,45 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { extractSheetId, getSheetMetadata, getSheetData, sheetDataToJSON, appendRows, updateRows, deleteRows, jsonToSheetRow } from '@/lib/googleSheets';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// Helper to fetch sheet data as CSV
-async function fetchSheetData(sheetId: string): Promise<string> {
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-  
-  const response = await fetch(csvUrl, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch sheet: ${response.statusText}`);
-  }
-  
-  return await response.text();
-}
-
-// Parse CSV to JSON
-function parseCSVToJSON(csv: string): any[] {
-  const lines = csv.split('\n').filter(line => line.trim());
-  if (lines.length === 0) {
-    return [];
-  }
-  
-  // First line is headers
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  
-  // Parse data rows
-  const data: any[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-    const row: any = {};
-    
-    headers.forEach((header, index) => {
-      row[header] = values[index] || '';
-    });
-    
-    data.push(row);
-  }
-  
-  return data;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,13 +41,14 @@ export async function POST(request: NextRequest) {
     
     console.log('[Google Sheets Query] Fetching data from sheet:', sheetId);
     
-    // Fetch and parse sheet data
-    const csvData = await fetchSheetData(sheetId);
-    let data = parseCSVToJSON(csvData);
+    // Get sheet metadata to find first sheet name
+    const metadata = await getSheetMetadata(sheetId);
+    const sheets = metadata.sheets || [];
+    const firstSheetName = sheets[0]?.properties?.title || 'Sheet1';
     
-    // If a custom query is provided, filter the data
-    // For now, we'll support simple filtering later
-    // Just return all data for GET requests
+    // Fetch and parse sheet data using service account
+    const rawData = await getSheetData(sheetId, firstSheetName);
+    const data = sheetDataToJSON(rawData);
     
     console.log('[Google Sheets Query] Returned', data.length, 'rows');
     
