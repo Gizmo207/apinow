@@ -544,6 +544,15 @@ export async function POST(
 
     // Legacy SQLite fallback (dev/local)
     if (dbType === 'sqlite' || (!dbType && !connectionId)) {
+      // SQLite write operations don't work on serverless (Vercel) - filesystem is read-only
+      if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+        return NextResponse.json({
+          error: 'SQLite is read-only in production',
+          details: 'SQLite databases cannot be modified on serverless platforms. Please use PostgreSQL, MySQL, MongoDB, or Google Sheets for write operations.',
+          suggestion: 'Switch to a cloud database for production use'
+        }, { status: 400 });
+      }
+
       const dbPath = getLatestDbFile();
       if (!dbPath) {
         return NextResponse.json({
