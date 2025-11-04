@@ -52,15 +52,50 @@ export async function storeSQLiteFile(file: File): Promise<string> {
     body: formData
   });
   
-  if (!response.ok) {
+  let blobUrl: string | null = null;
+  if (response.ok) {
+    const uploadData = await response.json();
+    blobUrl = uploadData.blobUrl;
+    console.log('[SQLite Browser] File uploaded to server:', blobUrl);
+    
+    // Store blobUrl in IndexedDB alongside the file
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('SQLiteDatabases', 1);
+      
+      request.onsuccess = (event: any) => {
+        const db = event.target.result;
+        const transaction = db.transaction(['databases'], 'readwrite');
+        const store = transaction.objectStore('databases');
+        
+        // Get existing data and add blobUrl
+        const getRequest = store.get(dbId);
+        getRequest.onsuccess = () => {
+          const existingData = getRequest.result;
+          if (existingData) {
+            existingData.blobUrl = blobUrl;
+            store.put(existingData, dbId);
+          }
+        };
+        
+        transaction.oncomplete = () => {
+          db.close();
+          resolve(null);
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error);
+        };
+      };
+    });
+  } else {
     console.error('Failed to upload SQLite file to server');
   }
   
   return dbId;
 }
 
-// Get database file data from IndexedDB
-export async function getDatabaseFile(dbId: string): Promise<Uint8Array | null> {
+// Get database file data and blobUrl from IndexedDB
+export async function getDatabaseFile(dbId: string): Promise<{ data: Uint8Array | null; blobUrl: string | null }> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('SQLiteDatabases', 1);
     
@@ -74,7 +109,14 @@ export async function getDatabaseFile(dbId: string): Promise<Uint8Array | null> 
       
       getRequest.onsuccess = () => {
         db.close();
-        resolve(getRequest.result ? getRequest.result.data : null);
+        if (getRequest.result) {
+          resolve({
+            data: getRequest.result.data || null,
+            blobUrl: getRequest.result.blobUrl || null
+          });
+        } else {
+          resolve({ data: null, blobUrl: null });
+        }
       };
       
       getRequest.onerror = () => {
@@ -87,8 +129,27 @@ export async function getDatabaseFile(dbId: string): Promise<Uint8Array | null> 
 
 // Query SQLite - sends file to server for processing
 export async function querySQLite(dbId: string, query: string) {
-  const dbData = await getDatabaseFile(dbId);
-  if (!dbData) throw new Error('Database not found');
+  const { data: dbData, blobUrl } = await getDatabaseFile(dbId);
+  
+  if (!dbData && !blobUrl) throw new Error('Database not found');
+  
+  // Prefer blobUrl (server-stored) for write operations
+  if (blobUrl) {
+    console.log('[SQLite Query] Using server-stored file:', blobUrl);
+    const response = await fetch('/api/sqlite/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blobUrl, query })
+    });
+    
+    if (!response.ok) throw new Error('Query failed');
+    
+    const result = await response.json();
+    return result.rows || result.data || [];
+  }
+  
+  // Fallback to browser file (read-only)
+  if (!dbData) throw new Error('Database data not found');
   
   // Convert to base64 for transmission
   const base64 = btoa(String.fromCharCode(...dbData));
@@ -107,8 +168,26 @@ export async function querySQLite(dbId: string, query: string) {
 
 // Get schema - sends file to server for processing  
 export async function getSQLiteSchema(dbId: string) {
-  const dbData = await getDatabaseFile(dbId);
-  if (!dbData) throw new Error('Database not found');
+  const { data: dbData, blobUrl } = await getDatabaseFile(dbId);
+  
+  if (!dbData && !blobUrl) throw new Error('Database not found');
+  
+  // Prefer blobUrl (server-stored)
+  if (blobUrl) {
+    console.log('[SQLite Schema] Using server-stored file:', blobUrl);
+    const response = await fetch('/api/sqlite/introspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blobUrl })
+    });
+    
+    if (!response.ok) throw new Error('Failed to load schema');
+    
+    return await response.json();
+  }
+  
+  // Fallback to browser file
+  if (!dbData) throw new Error('Database data not found');
   
   // Convert to base64 for transmission
   const base64 = btoa(String.fromCharCode(...dbData));
