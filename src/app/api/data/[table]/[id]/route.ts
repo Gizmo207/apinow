@@ -46,8 +46,8 @@ export async function GET(
 
     console.log('[API /data/[table]/[id] GET] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL using connectionId
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL/GoogleSheets using connectionId
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql' || dbType === 'googlesheets')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
@@ -354,6 +354,43 @@ export async function PUT(
         }
       }
 
+      if (dbType === 'googlesheets') {
+        // Google Sheets: Update row by ID
+        try {
+          const { getSheetData, updateRows, jsonToSheetRow, sheetDataToJSON } = await import('@/lib/googleSheets');
+          const sheetId = cfg.connectionString;
+          if (!sheetId) {
+            return NextResponse.json({ error: 'Sheet ID not found' }, { status: 500 });
+          }
+          
+          // Get all data to find row index
+          const rawData = await getSheetData(sheetId, table);
+          if (!rawData || rawData.length === 0) {
+            return NextResponse.json({ error: 'Sheet is empty' }, { status: 404 });
+          }
+          
+          const headers = rawData[0];
+          const jsonData = sheetDataToJSON(rawData);
+          const rowIndex = jsonData.findIndex((r: any) => String(r.ID) === String(id) || String(r.id) === String(id));
+          
+          if (rowIndex === -1) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          
+          // Merge existing data with updates
+          const updatedData = { ...jsonData[rowIndex], ...body };
+          const updatedRow = jsonToSheetRow(updatedData, headers);
+          
+          // Update in Google Sheets (row index + 2 because: 1 for 1-based indexing, 1 for header row)
+          await updateRows(sheetId, table, rowIndex + 2, [updatedRow]);
+          
+          return NextResponse.json({ success: true, row: updatedData, changes: 1 });
+        } catch (err: any) {
+          console.error('[API /data/[table]/[id] PUT][googlesheets] error:', err?.message || err);
+          return NextResponse.json({ error: 'Update error', details: err.message }, { status: 500 });
+        }
+      }
+
       if (dbType === 'mongodb') {
         const { MongoClient, ObjectId } = require('mongodb');
         const client = new MongoClient(cfg.connectionString);
@@ -611,6 +648,38 @@ export async function DELETE(
           return NextResponse.json({ success: true, row: result.recordset[0], changes: result.rowsAffected[0], message: 'Record deleted successfully' });
         } catch (err: any) {
           console.error('[API /data/[table]/[id] DELETE][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Delete error', details: err.message }, { status: 500 });
+        }
+      }
+
+      if (dbType === 'googlesheets') {
+        // Google Sheets: Delete row by ID
+        try {
+          const { getSheetData, deleteRows, sheetDataToJSON } = await import('@/lib/googleSheets');
+          const sheetId = cfg.connectionString;
+          if (!sheetId) {
+            return NextResponse.json({ error: 'Sheet ID not found' }, { status: 500 });
+          }
+          
+          // Get all data to find row index
+          const rawData = await getSheetData(sheetId, table);
+          if (!rawData || rawData.length === 0) {
+            return NextResponse.json({ error: 'Sheet is empty' }, { status: 404 });
+          }
+          
+          const jsonData = sheetDataToJSON(rawData);
+          const rowIndex = jsonData.findIndex((r: any) => String(r.ID) === String(id) || String(r.id) === String(id));
+          
+          if (rowIndex === -1) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          
+          // Delete from Google Sheets (row index + 2 because: 1 for 1-based indexing, 1 for header row)
+          await deleteRows(sheetId, table, rowIndex + 2, 1);
+          
+          return NextResponse.json({ success: true, changes: 1, message: 'Record deleted successfully' });
+        } catch (err: any) {
+          console.error('[API /data/[table]/[id] DELETE][googlesheets] error:', err?.message || err);
           return NextResponse.json({ error: 'Delete error', details: err.message }, { status: 500 });
         }
       }

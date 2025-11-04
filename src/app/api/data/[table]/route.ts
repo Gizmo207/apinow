@@ -72,8 +72,8 @@ export async function GET(
 
     console.log('[API /data GET] Table:', table, 'Type:', dbType || '(none)');
 
-    // New secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL using connectionId
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
+    // New secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL/GoogleSheets using connectionId
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql' || dbType === 'googlesheets')) {
       // Resolve credentials server-side
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
@@ -123,6 +123,29 @@ export async function GET(
           return NextResponse.json({ data: result.recordset, count: result.recordset.length });
         } catch (err: any) {
           console.error('[API /data GET][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
+        }
+      }
+
+      if (dbType === 'googlesheets') {
+        // Google Sheets: Call the googlesheets query API
+        try {
+          const { getSheetData, sheetDataToJSON } = await import('@/lib/googleSheets');
+          const sheetId = cfg.connectionString; // connectionString holds the sheet ID
+          if (!sheetId) {
+            return NextResponse.json({ error: 'Sheet ID not found' }, { status: 500 });
+          }
+          
+          const rawData = await getSheetData(sheetId, table);
+          if (!rawData || rawData.length === 0) {
+            return NextResponse.json({ data: [], count: 0 });
+          }
+          
+          const jsonData = sheetDataToJSON(rawData);
+          const limitedData = jsonData.slice(0, limit);
+          return NextResponse.json({ data: limitedData, count: limitedData.length });
+        } catch (err: any) {
+          console.error('[API /data GET][googlesheets] error:', err?.message || err);
           return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
         }
       }
@@ -344,7 +367,7 @@ export async function POST(
     const requesterId = request.headers.get('x-user-id') || request.headers.get('x-user') || undefined;
 
     // If connectionId + supported engine are present, use server-side credentials
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql' || dbType === 'googlesheets')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
@@ -404,6 +427,31 @@ export async function POST(
           return NextResponse.json({ success: true, id: result.recordset[0]?.id, data: result.recordset[0] });
         } catch (err: any) {
           console.error('[API /data POST][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Insert error', details: err.message }, { status: 500 });
+        }
+      }
+
+      if (dbType === 'googlesheets') {
+        // Google Sheets: Append row
+        try {
+          const { getSheetData, appendRows, jsonToSheetRow } = await import('@/lib/googleSheets');
+          const sheetId = cfg.connectionString;
+          if (!sheetId) {
+            return NextResponse.json({ error: 'Sheet ID not found' }, { status: 500 });
+          }
+          
+          // Get header row to determine column order
+          const rawData = await getSheetData(sheetId, table);
+          if (!rawData || rawData.length === 0) {
+            return NextResponse.json({ error: 'Sheet is empty, cannot determine columns' }, { status: 400 });
+          }
+          
+          const headers = rawData[0];
+          const row = jsonToSheetRow(body, headers);
+          await appendRows(sheetId, table, [row]);
+          return NextResponse.json({ success: true, data: body });
+        } catch (err: any) {
+          console.error('[API /data POST][googlesheets] error:', err?.message || err);
           return NextResponse.json({ error: 'Insert error', details: err.message }, { status: 500 });
         }
       }
