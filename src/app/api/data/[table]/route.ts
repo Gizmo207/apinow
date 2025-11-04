@@ -72,8 +72,8 @@ export async function GET(
 
     console.log('[API /data GET] Table:', table, 'Type:', dbType || '(none)');
 
-    // New secure model for Postgres/MySQL/MariaDB using connectionId
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb')) {
+    // New secure model for Postgres/MySQL/MariaDB/MongoDB using connectionId
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
       // Resolve credentials server-side
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
@@ -81,6 +81,24 @@ export async function GET(
       // Enforce ownership when present
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mongodb') {
+        // MongoDB using connectionString from config
+        const { MongoClient } = require('mongodb');
+        const client = new MongoClient(cfg.connectionString);
+        try {
+          await client.connect();
+          const db = client.db();
+          const collection = db.collection(table);
+          const data = await collection.find({}).limit(limit).toArray();
+          await client.close();
+          return NextResponse.json({ data, count: data.length });
+        } catch (err: any) {
+          try { await client.close(); } catch {}
+          console.error('[API /data GET][mongodb] error:', err?.message || err);
+          return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'postgresql') {
@@ -282,7 +300,7 @@ export async function POST(
     const requesterId = request.headers.get('x-user-id') || request.headers.get('x-user') || undefined;
 
     // If connectionId + supported engine are present, use server-side credentials
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb')) {
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
@@ -292,6 +310,24 @@ export async function POST(
 
       const columns = Object.keys(body);
       if (columns.length === 0) return NextResponse.json({ error: 'No fields to insert' }, { status: 422 });
+
+      // MongoDB insert
+      if (dbType === 'mongodb') {
+        const { MongoClient } = require('mongodb');
+        const client = new MongoClient(cfg.connectionString);
+        try {
+          await client.connect();
+          const db = client.db();
+          const collection = db.collection(table);
+          const result = await collection.insertOne(body);
+          await client.close();
+          return NextResponse.json({ success: true, id: result.insertedId });
+        } catch (err: any) {
+          try { await client.close(); } catch {}
+          console.error('[API /data POST][mongodb] error:', err?.message || err);
+          return NextResponse.json({ error: 'Insert error', details: err.message }, { status: 500 });
+        }
+      }
 
       // Parameterized insert
       if (dbType === 'postgresql') {

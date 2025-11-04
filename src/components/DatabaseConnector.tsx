@@ -56,13 +56,25 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
           const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
           if (authUser?.uid) headers['x-user-id'] = authUser.uid;
+          
+          // For MongoDB, inject password into connection string if provided separately
+          let finalConnectionString = values.connectionString;
+          if (provider.engine === 'mongodb' && values.password) {
+            // Replace <db_password>, <password>, or PASSWORD placeholder with actual password
+            finalConnectionString = finalConnectionString
+              .replace('<db_password>', encodeURIComponent(values.password))
+              .replace('<password>', encodeURIComponent(values.password))
+              .replace(':PASSWORD@', `:${encodeURIComponent(values.password)}@`);
+          }
+          
           const res = await fetch('/api/connections', {
             method: 'POST',
             headers,
             body: JSON.stringify({
               type: provider.engine,
               name: dbName || `${provider.name} Connection`,
-              connectionString: values.connectionString,
+              connectionString: finalConnectionString,
+              database: values.database,
               ownerId: authUser?.uid
             })
           });
@@ -132,22 +144,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
           </div>
 
           <div className="space-y-4">
-            {/* Database Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Database Name <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="text"
-                value={dbName}
-                onChange={e => setDbName(e.target.value)}
-                placeholder="My Database"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            {/* Engine Selection */}
+            {/* Engine Selection - FIRST */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Database Engine <span className="text-red-600">*</span>
@@ -170,7 +167,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
               </select>
             </div>
 
-            {/* Provider Selection */}
+            {/* Provider Selection - SECOND */}
             {dbEngine && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -189,6 +186,26 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+            
+            {/* Connection Name - LAST */}
+            {providerKey && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Connection Name <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={dbName}
+                  onChange={e => setDbName(e.target.value)}
+                  placeholder="My MongoDB Atlas"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  A friendly name to identify this connection in your app (you choose this)
+                </p>
               </div>
             )}
 

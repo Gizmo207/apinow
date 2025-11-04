@@ -46,14 +46,34 @@ export async function GET(
 
     console.log('[API /data/[table]/[id] GET] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB using connectionId
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB using connectionId
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
       
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mongodb') {
+        const { MongoClient, ObjectId } = require('mongodb');
+        const client = new MongoClient(cfg.connectionString);
+        try {
+          await client.connect();
+          const db = client.db();
+          const collection = db.collection(table);
+          const doc = await collection.findOne({ _id: new ObjectId(id) });
+          await client.close();
+          if (!doc) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          return NextResponse.json({ data: doc });
+        } catch (err: any) {
+          try { await client.close(); } catch {}
+          console.error('[API /data/[table]/[id] GET][mongodb] error:', err?.message || err);
+          return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'postgresql') {
@@ -216,14 +236,34 @@ export async function PUT(
 
     console.log('[API /data/[table]/[id] PUT] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
       
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mongodb') {
+        const { MongoClient, ObjectId } = require('mongodb');
+        const client = new MongoClient(cfg.connectionString);
+        try {
+          await client.connect();
+          const db = client.db();
+          const collection = db.collection(table);
+          const result = await collection.updateOne({ _id: new ObjectId(id) }, { $set: body });
+          await client.close();
+          if (result.matchedCount === 0) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          return NextResponse.json({ success: true, changes: result.modifiedCount });
+        } catch (err: any) {
+          try { await client.close(); } catch {}
+          console.error('[API /data/[table]/[id] PUT][mongodb] error:', err?.message || err);
+          return NextResponse.json({ error: 'Update error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'postgresql') {
@@ -411,14 +451,34 @@ export async function DELETE(
 
     console.log('[API /data/[table]/[id] DELETE] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
       
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mongodb') {
+        const { MongoClient, ObjectId } = require('mongodb');
+        const client = new MongoClient(cfg.connectionString);
+        try {
+          await client.connect();
+          const db = client.db();
+          const collection = db.collection(table);
+          const result = await collection.deleteOne({ _id: new ObjectId(id) });
+          await client.close();
+          if (result.deletedCount === 0) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          return NextResponse.json({ success: true, changes: result.deletedCount, message: 'Record deleted successfully' });
+        } catch (err: any) {
+          try { await client.close(); } catch {}
+          console.error('[API /data/[table]/[id] DELETE][mongodb] error:', err?.message || err);
+          return NextResponse.json({ error: 'Delete error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'postgresql') {

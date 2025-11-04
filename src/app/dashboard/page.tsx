@@ -452,6 +452,11 @@ export default function DashboardPage() {
                                         if (col.primaryKey && !col.type?.toLowerCase().includes('uuid')) return;
                                         if (col.name === 'id' && !col.type?.toLowerCase().includes('uuid')) return;
                                         
+                                        // MongoDB: Skip _id field entirely (MongoDB generates it)
+                                        if (testEndpoint.database?.type === 'mongodb' && col.name === '_id') {
+                                          return;
+                                        }
+                                        
                                         // Skip foreign key UUID fields
                                         const colName = col.name?.toLowerCase() || '';
                                         if (colName.endsWith('_id') && col.type?.toLowerCase().includes('uuid')) {

@@ -5,11 +5,26 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const { connectionString, collection, operation, query, document, limit } = await request.json();
+    const { connectionString, connectionId, collection, operation, query, document, limit } = await request.json();
 
-    if (!connectionString) {
+    let finalConnectionString = connectionString;
+
+    // If connectionId provided, fetch connection string securely
+    if (connectionId) {
+      const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
+      const cfg = await getConnectionConfig(connectionId);
+      if (!cfg || !cfg.connectionString) {
+        return NextResponse.json(
+          { error: 'Invalid connectionId or connection not found' },
+          { status: 404 }
+        );
+      }
+      finalConnectionString = cfg.connectionString;
+    }
+
+    if (!finalConnectionString) {
       return NextResponse.json(
-        { error: 'Connection string is required' },
+        { error: 'Connection string or connectionId is required' },
         { status: 400 }
       );
     }
@@ -24,7 +39,7 @@ export async function POST(request: NextRequest) {
     console.log('[MongoDB Query] Operation:', operation || 'find', 'Collection:', collection);
 
     // Create MongoDB client
-    const client = new MongoClient(connectionString, {
+    const client = new MongoClient(finalConnectionString, {
       serverSelectionTimeoutMS: 5000,
     });
 

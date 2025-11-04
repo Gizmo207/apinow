@@ -145,7 +145,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            connectionString: selectedDb.connectionString,
+            connectionId: selectedDb.id,
             collection: table.name,
             operation: 'find',
             limit: 100

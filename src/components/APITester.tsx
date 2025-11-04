@@ -69,6 +69,11 @@ export function APITester() {
                     if (col.primaryKey && !col.type?.toLowerCase().includes('uuid')) return;
                     if (col.name === 'id' && !col.type?.toLowerCase().includes('uuid')) return;
                     
+                    // MongoDB: Skip _id field entirely (MongoDB generates it)
+                    if (matchingEndpoint.database?.type === 'mongodb' && col.name === '_id') {
+                      return;
+                    }
+                    
                     // Skip foreign key UUID fields (usually end with _id and reference other tables)
                     const colName = col.name?.toLowerCase() || '';
                     if (colName.endsWith('_id') && col.type?.toLowerCase().includes('uuid')) {
@@ -143,6 +148,28 @@ export function APITester() {
                   }
                 }
                 
+                // For MongoDB GET/:id or DELETE/:id, fetch existing document first (can't create without valid ObjectId)
+                if (matchingEndpoint.database?.type === 'mongodb' && (method === 'GET' || method === 'DELETE')) {
+                  const listPath = matchingEndpoint.path.replace(/\/:[^/]+$/, '');
+                  const listResponse = await fetch(`${origin}${listPath}?limit=1`, {
+                    method: 'GET',
+                    headers: {
+                      'x-db-type': 'mongodb',
+                      'x-connection-id': matchingEndpoint.database?.id || ''
+                    }
+                  });
+                  
+                  const listResult = await listResponse.json();
+                  console.log('[Auto-fill][MongoDB] List response:', listResult);
+                  
+                  const firstDoc = listResult.data?.[0];
+                  if (firstDoc && firstDoc._id) {
+                    setUrl(processedUrl.replace(':id', String(firstDoc._id)));
+                    console.log('[Auto-fill][MongoDB] Using existing _id:', firstDoc._id);
+                    return;
+                  }
+                }
+                
                 // Fallback: try to get existing ID
                 const listEndpoint = savedEndpoints.find(
                   ep => ep.table === matchingEndpoint.table && ep.method === 'GET' && !ep.path.includes(':id')
@@ -199,6 +226,11 @@ export function APITester() {
             matchingEndpoint.columns.forEach((col: any) => {
               // Skip auto-increment primary keys (but allow UUID primary keys)
               if (col.primaryKey && !col.type?.toLowerCase().includes('uuid') && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial') || col.name === 'id')) {
+                return;
+              }
+              
+              // MongoDB: Skip _id field entirely (MongoDB generates it)
+              if (matchingEndpoint.database?.type === 'mongodb' && col.name === '_id') {
                 return;
               }
               

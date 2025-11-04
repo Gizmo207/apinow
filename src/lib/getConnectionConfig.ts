@@ -9,6 +9,7 @@ export interface ConnectionConfig {
   ssl?: boolean;
   ownerId?: string;
   type?: string;
+  connectionString?: string; // For MongoDB
 }
 
 function parseMysqlDsn(dsn: string) {
@@ -77,7 +78,24 @@ export async function getConnectionConfig(connectionId: string): Promise<Connect
     else portRaw = 5432;
   }
 
-  // Validate required fields
+  // For MongoDB, return connectionString directly
+  if (type === 'mongodb') {
+    const connectionString = data.connectionString;
+    if (!connectionString) return null;
+    return { 
+      connectionString, 
+      ownerId, 
+      type,
+      // Dummy values for compatibility
+      host: '', 
+      port: 0, 
+      user: '', 
+      password: '', 
+      database: database || ''
+    };
+  }
+
+  // Validate required fields for SQL databases
   if (!host || !user || !password) return null;
 
   const port = typeof portRaw === 'string' ? parseInt(portRaw, 10) : Number(portRaw);
