@@ -6,11 +6,8 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user ID for security
-    const userId = getCurrentUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Get user ID for security (optional for now)
+    const userId = getCurrentUserId(request) || 'anonymous';
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
