@@ -128,14 +128,29 @@ export function APITester() {
                   const createResult = await createResponse.json();
                   console.log('[Auto-fill] Create response:', createResult);
                   
-                  // Extract ID - could be integer or UUID
-                  let newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                  // Extract ID - could be integer or UUID, check both lowercase and uppercase
+                  let newId = createResult.id || createResult.data?.id || createResult.data?.ID || createResult.row?.id || createResult.row?.ID;
                   
-                  // For PostgreSQL, check if there's a UUID primary key in the returned row
+                  // For PostgreSQL or other DBs, check if there's a primary key column in the returned data
                   if (!newId && createResult.row) {
                     const pkColumn = matchingEndpoint.columns?.find((col: any) => col.primaryKey);
                     if (pkColumn) {
                       newId = createResult.row[pkColumn.name];
+                    }
+                  }
+                  
+                  // If still no ID, check the data object with any column that might be an ID
+                  if (!newId && createResult.data) {
+                    // Try common ID field names (case-insensitive)
+                    const dataObj = createResult.data;
+                    newId = dataObj.id || dataObj.ID || dataObj.Id || dataObj._id;
+                    
+                    // If still nothing, look for columns marked as primaryKey
+                    if (!newId) {
+                      const pkColumn = matchingEndpoint.columns?.find((col: any) => col.primaryKey);
+                      if (pkColumn) {
+                        newId = dataObj[pkColumn.name];
+                      }
                     }
                   }
                   
