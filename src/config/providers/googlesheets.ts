@@ -30,7 +30,7 @@ export const GOOGLESHEETS_PROVIDERS: ProviderConfig[] = [
         type: 'text',
         required: true,
         placeholder: 'https://docs.google.com/spreadsheets/d/SHEET_ID/edit',
-        helpText: 'Paste your Google Sheets URL (must be publicly accessible)',
+        helpText: 'Paste your Google Sheets URL',
         pattern: /^https:\/\/docs\.google\.com\/spreadsheets\//,
         validate: (value: string) => {
           if (!value.includes('docs.google.com/spreadsheets/')) {
@@ -38,6 +38,13 @@ export const GOOGLESHEETS_PROVIDERS: ProviderConfig[] = [
           }
           return true;
         },
+      },
+      {
+        name: 'shareConfirmation',
+        label: 'Share Confirmation',
+        type: 'checkbox',
+        required: true,
+        helpText: 'I have shared this Google Sheet with the service account email as Editor',
       },
     ],
     normalize: (values: Record<string, any>) => {

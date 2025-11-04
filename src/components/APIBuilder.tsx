@@ -82,6 +82,12 @@ export function APIBuilder({ databases }: APIBuilderProps) {
           headers,
           body: JSON.stringify({ connectionId: selectedDb.id })
         });
+      } else if (selectedDb.type === 'googlesheets') {
+        res = await fetch('/api/googlesheets/introspect', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
+        });
       } else {
         setTables([]);
         alert('Database type not yet supported in Endpoint Builder');
@@ -95,7 +101,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       const tablesList = data.tables || [];
       
       let formattedTables;
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb' || selectedDb.type === 'mssql') {
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb' || selectedDb.type === 'mssql' || selectedDb.type === 'googlesheets') {
         formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []

@@ -255,6 +255,58 @@ export function DynamicProviderForm({
         </div>
       ))}
 
+      {/* Google Sheets Special Warning */}
+      {provider.engine === 'googlesheets' && (
+        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-yellow-900 text-lg mb-2">
+                ⚠️ REQUIRED: Share Your Sheet First!
+              </h4>
+              <p className="text-sm text-yellow-800 mb-3">
+                Before you can connect, you MUST share your Google Sheet with our service account.
+              </p>
+              
+              <div className="bg-white border border-yellow-300 rounded-lg p-3 mb-3">
+                <p className="text-xs font-medium text-yellow-900 mb-1">Copy this email:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-800 break-all">
+                    firebase-adminsdk-fbsvc@api-now-bd858.iam.gserviceaccount.com
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('firebase-adminsdk-fbsvc@api-now-bd858.iam.gserviceaccount.com');
+                      alert('✓ Email copied to clipboard!');
+                    }}
+                    className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 whitespace-nowrap"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm text-yellow-900">
+                <p className="font-medium">Steps:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Open your Google Sheet</li>
+                  <li>Click the "Share" button (top right corner)</li>
+                  <li>Paste the email above</li>
+                  <li>Set permission to <strong>"Editor"</strong> (not Viewer!)</li>
+                  <li>Click "Send" or "Done"</li>
+                  <li>Then come back here and check the confirmation box below</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Provider help section */}
       {(provider.helpSteps || provider.connectionStringFormat) && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
