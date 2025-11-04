@@ -4,6 +4,7 @@ import { SQLITE_PROVIDERS } from './sqlite';
 import { MARIADB_PROVIDERS } from './mariadb';
 import { MONGODB_PROVIDERS } from './mongodb';
 import { MSSQL_PROVIDERS } from './mssql';
+import { GOOGLESHEETS_PROVIDERS } from './googlesheets';
 import { ProviderConfig, Engine } from './types';
 
 // Centralized provider registry - single source of truth
@@ -14,6 +15,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = [
   ...MARIADB_PROVIDERS,
   ...MONGODB_PROVIDERS,
   ...MSSQL_PROVIDERS,
+  ...GOOGLESHEETS_PROVIDERS,
 ].reduce((acc, provider) => {
   acc[provider.key] = provider;
   return acc;

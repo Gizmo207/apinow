@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Allowed engines we can accept via this create endpoint
-const ALLOWED_ENGINES = new Set(['postgresql', 'mysql', 'mariadb', 'mongodb', 'mssql']);
+const ALLOWED_ENGINES = new Set(['postgresql', 'mysql', 'mariadb', 'mongodb', 'mssql', 'googlesheets']);
 
 function parseBoolean(val: any, fallback = false): boolean {
   if (typeof val === 'boolean') return val;

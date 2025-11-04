@@ -6,7 +6,8 @@ export type Engine =
   | 'postgresql'
   | 'mongodb' 
   | 'mssql' 
-  | 'mariadb';
+  | 'mariadb'
+  | 'googlesheets';
 
 export type FieldType = 
   | 'text' 

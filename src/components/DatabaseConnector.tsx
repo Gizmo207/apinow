@@ -25,6 +25,7 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
     { value: 'postgresql', label: 'PostgreSQL', description: 'Advanced features' },
     { value: 'mssql', label: 'Microsoft SQL Server', description: 'Enterprise database' },
     { value: 'mongodb', label: 'MongoDB', description: 'Document database (NoSQL)' },
+    { value: 'googlesheets', label: 'Google Sheets', description: 'Spreadsheets as APIs' },
   ];
 
 

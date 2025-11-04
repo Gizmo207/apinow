@@ -78,6 +78,12 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
           headers,
           body: JSON.stringify({ connectionId: selectedDb.id })
         });
+      } else if (selectedDb.type === 'googlesheets') {
+        res = await fetch('/api/googlesheets/introspect', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ connectionId: selectedDb.id })
+        });
       } else {
         alert('Database type not yet supported');
         return;
@@ -103,8 +109,8 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       const tablesList = data.tables || [];
       console.log('Tables list:', tablesList);
       
-      // Convert MySQL, MariaDB, PostgreSQL, MongoDB, and MSSQL tables to the format expected
-      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb' || selectedDb.type === 'mssql') {
+      // Convert MySQL, MariaDB, PostgreSQL, MongoDB, MSSQL, and Google Sheets tables to the format expected
+      if (selectedDb.type === 'mysql' || selectedDb.type === 'mariadb' || selectedDb.type === 'postgresql' || selectedDb.type === 'mongodb' || selectedDb.type === 'mssql' || selectedDb.type === 'googlesheets') {
         const formattedTables = tablesList.map((tableName: string) => ({
           name: tableName,
           columns: data.schema[tableName] || []
@@ -171,6 +177,14 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
             collection: table.name,
             operation: 'find',
             limit: 100
+          })
+        });
+      } else if (selectedDb.type === 'googlesheets') {
+        res = await fetch('/api/googlesheets/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connectionId: selectedDb.id
           })
         });
       } else {
