@@ -6,8 +6,14 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user ID for security (optional for now)
-    const userId = getCurrentUserId(request) || 'anonymous';
+    // Get user ID for security (works with Firebase anonymous users too)
+    const userId = getCurrentUserId(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please ensure you are logged in (anonymous login is supported).' },
+        { status: 401 }
+      );
+    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;

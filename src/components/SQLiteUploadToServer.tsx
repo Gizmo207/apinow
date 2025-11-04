@@ -21,11 +21,19 @@ export function SQLiteUploadToServer({ onUploadComplete }: SQLiteUploadToServerP
     setSuccess(false);
 
     try {
+      // Get authenticated user (including anonymous users)
+      const authUserRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+      const authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+      
       const formData = new FormData();
       formData.append('file', file);
 
+      const headers: Record<string, string> = {};
+      if (authUser?.uid) headers['x-user-id'] = authUser.uid;
+
       const response = await fetch('/api/sqlite/upload', {
         method: 'POST',
+        headers,
         body: formData,
       });
 
