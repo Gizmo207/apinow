@@ -78,8 +78,8 @@ export async function getConnectionConfig(connectionId: string): Promise<Connect
     else portRaw = 5432;
   }
 
-  // For MongoDB and MSSQL, return connectionString directly
-  if (type === 'mongodb' || type === 'mssql') {
+  // For MongoDB, MSSQL, and Google Sheets, return connectionString directly
+  if (type === 'mongodb' || type === 'mssql' || type === 'googlesheets') {
     const connectionString = data.connectionString;
     if (!connectionString) return null;
     return { 
