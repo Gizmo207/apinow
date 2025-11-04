@@ -46,14 +46,60 @@ export async function GET(
 
     console.log('[API /data/[table]/[id] GET] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB/MongoDB using connectionId
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL using connectionId
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
       
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mssql') {
+        const sql = require('mssql');
+        if (!cfg.connectionString) {
+          return NextResponse.json({ error: 'MSSQL connection string not found' }, { status: 500 });
+        }
+        const config: any = {};
+        const parts = cfg.connectionString.split(';');
+        for (const part of parts) {
+          const [key, value] = part.split('=');
+          if (key && value) {
+            const k = key.trim().toLowerCase();
+            const v = value.trim();
+            if (k === 'server') {
+              const serverPart = v.replace('tcp:', '');
+              const [host, port] = serverPart.split(',');
+              config.server = host;
+              config.port = port ? parseInt(port) : 1433;
+            } else if (k === 'database') {
+              config.database = v;
+            } else if (k === 'user id' || k === 'uid') {
+              config.user = v;
+            } else if (k === 'password' || k === 'pwd') {
+              config.password = v;
+            } else if (k === 'encrypt') {
+              config.encrypt = v.toLowerCase() === 'true';
+            } else if (k === 'trustservercertificate') {
+              config.trustServerCertificate = v.toLowerCase() === 'true';
+            }
+          }
+        }
+        try {
+          const pool = await sql.connect(config);
+          const result = await pool.request()
+            .input('id', id)
+            .query(`SELECT * FROM ${table} WHERE id = @id`);
+          await pool.close();
+          if (result.recordset.length === 0) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          return NextResponse.json({ data: result.recordset[0] });
+        } catch (err: any) {
+          console.error('[API /data/[table]/[id] GET][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'mongodb') {
@@ -236,14 +282,65 @@ export async function PUT(
 
     console.log('[API /data/[table]/[id] PUT] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB/MongoDB
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
       
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mssql') {
+        const sql = require('mssql');
+        if (!cfg.connectionString) {
+          return NextResponse.json({ error: 'MSSQL connection string not found' }, { status: 500 });
+        }
+        const config: any = {};
+        const parts = cfg.connectionString.split(';');
+        for (const part of parts) {
+          const [key, value] = part.split('=');
+          if (key && value) {
+            const k = key.trim().toLowerCase();
+            const v = value.trim();
+            if (k === 'server') {
+              const serverPart = v.replace('tcp:', '');
+              const [host, port] = serverPart.split(',');
+              config.server = host;
+              config.port = port ? parseInt(port) : 1433;
+            } else if (k === 'database') {
+              config.database = v;
+            } else if (k === 'user id' || k === 'uid') {
+              config.user = v;
+            } else if (k === 'password' || k === 'pwd') {
+              config.password = v;
+            } else if (k === 'encrypt') {
+              config.encrypt = v.toLowerCase() === 'true';
+            } else if (k === 'trustservercertificate') {
+              config.trustServerCertificate = v.toLowerCase() === 'true';
+            }
+          }
+        }
+        try {
+          const pool = await sql.connect(config);
+          const setClauses = columns.map((col, i) => `${col} = @param${i}`).join(', ');
+          const query = `UPDATE ${table} SET ${setClauses} OUTPUT INSERTED.* WHERE id = @id`;
+          const preparedRequest = pool.request();
+          preparedRequest.input('id', id);
+          Object.values(body).forEach((val, i) => {
+            preparedRequest.input(`param${i}`, val);
+          });
+          const result = await preparedRequest.query(query);
+          await pool.close();
+          if (result.recordset.length === 0) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          return NextResponse.json({ success: true, row: result.recordset[0], changes: result.rowsAffected[0] });
+        } catch (err: any) {
+          console.error('[API /data/[table]/[id] PUT][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Update error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'mongodb') {
@@ -451,14 +548,60 @@ export async function DELETE(
 
     console.log('[API /data/[table]/[id] DELETE] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB/MongoDB
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
       
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mssql') {
+        const sql = require('mssql');
+        if (!cfg.connectionString) {
+          return NextResponse.json({ error: 'MSSQL connection string not found' }, { status: 500 });
+        }
+        const config: any = {};
+        const parts = cfg.connectionString.split(';');
+        for (const part of parts) {
+          const [key, value] = part.split('=');
+          if (key && value) {
+            const k = key.trim().toLowerCase();
+            const v = value.trim();
+            if (k === 'server') {
+              const serverPart = v.replace('tcp:', '');
+              const [host, port] = serverPart.split(',');
+              config.server = host;
+              config.port = port ? parseInt(port) : 1433;
+            } else if (k === 'database') {
+              config.database = v;
+            } else if (k === 'user id' || k === 'uid') {
+              config.user = v;
+            } else if (k === 'password' || k === 'pwd') {
+              config.password = v;
+            } else if (k === 'encrypt') {
+              config.encrypt = v.toLowerCase() === 'true';
+            } else if (k === 'trustservercertificate') {
+              config.trustServerCertificate = v.toLowerCase() === 'true';
+            }
+          }
+        }
+        try {
+          const pool = await sql.connect(config);
+          const result = await pool.request()
+            .input('id', id)
+            .query(`DELETE FROM ${table} OUTPUT DELETED.* WHERE id = @id`);
+          await pool.close();
+          if (result.recordset.length === 0) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+          }
+          return NextResponse.json({ success: true, row: result.recordset[0], changes: result.rowsAffected[0], message: 'Record deleted successfully' });
+        } catch (err: any) {
+          console.error('[API /data/[table]/[id] DELETE][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Delete error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'mongodb') {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { HelpCircle, Zap, CheckCircle, XCircle } from 'lucide-react';
+import { HelpCircle, Zap, CheckCircle, XCircle, X, Eye, EyeOff } from 'lucide-react';
 import { getProvider } from '@/config/providers';
 
 interface DynamicProviderFormProps {
@@ -20,6 +20,7 @@ export function DynamicProviderForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [testResult, setTestResult] = useState<any>(null);
   const [testing, setTesting] = useState(false);
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   if (!provider) {
     return <div className="text-red-600">Provider configuration not found</div>;
@@ -70,16 +71,48 @@ export function DynamicProviderForm({
 
   const updateValue = (fieldName: string, value: any) => {
     setValues(prev => ({ ...prev, [fieldName]: value }));
-    // Clear error for this field
-    if (errors[fieldName]) {
+    
+    // Validate field in real-time
+    const field = provider.fields.find(f => f.name === fieldName);
+    if (field && field.validate && value) {
+      const validationResult = field.validate(value);
+      if (validationResult !== true) {
+        setErrors(prev => ({ ...prev, [fieldName]: validationResult as string }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[fieldName];
+          return newErrors;
+        });
+      }
+    } else {
+      // Clear error if no validation or empty value
       setErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[fieldName];
         return newErrors;
       });
     }
+    
     // Clear test result when values change
     setTestResult(null);
+  };
+
+  // Get field validation state: null (empty), true (valid), false (invalid)
+  const getFieldState = (field: any): null | boolean => {
+    const value = values[field.name];
+    
+    // Empty field = no icon
+    if (!value || value === '') return null;
+    
+    // Has validation function
+    if (field.validate) {
+      const result = field.validate(value);
+      return result === true;
+    }
+    
+    // No validation function, just check if has value
+    return true;
   };
 
   const handleTestConnection = async () => {
@@ -169,23 +202,47 @@ export function DynamicProviderForm({
               <span className="text-sm text-gray-700">{field.helpText || 'Enable'}</span>
             </label>
           ) : field.type === 'password' ? (
-            <input
-              type="password"
-              value={values[field.name] || ''}
-              onChange={e => updateValue(field.name, e.target.value)}
-              placeholder={field.placeholder}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-              required={field.required}
-            />
+            <div className="relative">
+              <input
+                type={showPasswords[field.name] ? 'text' : 'password'}
+                value={values[field.name] || ''}
+                onChange={e => updateValue(field.name, e.target.value)}
+                placeholder={field.placeholder}
+                className="w-full px-3 py-2 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                required={field.required}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPasswords(prev => ({ ...prev, [field.name]: !prev[field.name] }))}
+                className="absolute right-10 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                title={showPasswords[field.name] ? 'Hide password' : 'Show password'}
+              >
+                {showPasswords[field.name] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+              {getFieldState(field) === true && (
+                <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-600" />
+              )}
+              {getFieldState(field) === false && (
+                <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-600" />
+              )}
+            </div>
           ) : (
-            <input
-              type={field.type === 'number' ? 'number' : 'text'}
-              value={values[field.name] || ''}
-              onChange={e => updateValue(field.name, e.target.value)}
-              placeholder={field.placeholder}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-              required={field.required}
-            />
+            <div className="relative">
+              <input
+                type={field.type === 'number' ? 'number' : 'text'}
+                value={values[field.name] || ''}
+                onChange={e => updateValue(field.name, e.target.value)}
+                placeholder={field.placeholder}
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                required={field.required}
+              />
+              {getFieldState(field) === true && (
+                <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-600" />
+              )}
+              {getFieldState(field) === false && (
+                <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-600" />
+              )}
+            </div>
           )}
           
           {field.helpText && (

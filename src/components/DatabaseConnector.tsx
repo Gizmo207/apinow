@@ -56,14 +56,22 @@ export function DatabaseConnector({ databases, onAdd, onDelete }: DatabaseConnec
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
           if (authUser?.uid) headers['x-user-id'] = authUser.uid;
           
-          // For MongoDB, inject password into connection string if provided separately
+          // For MongoDB and MariaDB, inject password into connection string if provided separately
           let finalConnectionString = values.connectionString;
-          if (provider.engine === 'mongodb' && values.password) {
+          if ((provider.engine === 'mongodb' || provider.engine === 'mariadb') && values.password !== undefined) {
             // Replace <db_password>, <password>, or PASSWORD placeholder with actual password
-            finalConnectionString = finalConnectionString
-              .replace('<db_password>', encodeURIComponent(values.password))
-              .replace('<password>', encodeURIComponent(values.password))
-              .replace(':PASSWORD@', `:${encodeURIComponent(values.password)}@`);
+            // If password is empty string, remove the colon too for no-password connections
+            if (values.password === '') {
+              finalConnectionString = finalConnectionString
+                .replace(':PASSWORD@', '@')
+                .replace(':<db_password>@', '@')
+                .replace(':<password>@', '@');
+            } else {
+              finalConnectionString = finalConnectionString
+                .replace('<db_password>', encodeURIComponent(values.password))
+                .replace('<password>', encodeURIComponent(values.password))
+                .replace(':PASSWORD@', `:${encodeURIComponent(values.password)}@`);
+            }
           }
           
           const res = await fetch('/api/connections', {

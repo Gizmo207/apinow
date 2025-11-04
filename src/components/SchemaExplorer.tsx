@@ -86,7 +86,14 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
       if (!res.ok) {
         const errorData = await res.json();
         console.error('API Error:', errorData);
-        throw new Error('Failed to load schema');
+        
+        // Show detailed error message for authentication issues
+        if (errorData.solution && errorData.fixCommands) {
+          const errorMessage = `${errorData.message}\n\n${errorData.solution}\n${errorData.fixCommands.join('\n')}\n\n${errorData.helpText}`;
+          alert(errorMessage);
+        }
+        
+        throw new Error(errorData.error || 'Failed to load schema');
       }
 
       const data = await res.json();

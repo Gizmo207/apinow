@@ -37,6 +37,16 @@ export async function POST(request: NextRequest) {
         database: cfg.database,
         ssl: cfg.ssl ? { rejectUnauthorized: false } : undefined,
       };
+      
+      // Debug logging (remove after fixing)
+      console.log('=== MariaDB Connection Debug ===');
+      console.log('Host:', cfg.host);
+      console.log('Port:', cfg.port);
+      console.log('User:', cfg.user);
+      console.log('Password length:', cfg.password?.length || 0);
+      console.log('Password (first 3 chars):', cfg.password?.substring(0, 3) || '(empty)');
+      console.log('Database:', cfg.database);
+      console.log('================================');
     } else {
       // Backward compatibility: accept raw connection string
       if (connectionString.includes('ssl-mode=REQUIRED')) {
@@ -61,11 +71,60 @@ export async function POST(request: NextRequest) {
     }
 
     // Create connection
-    const connection = await mysql.createConnection(connectionConfig);
-
+    let connection;
     try {
+      connection = await mysql.createConnection(connectionConfig);
       // Test connection
       await connection.ping();
+    } catch (authError: any) {
+      // Handle MariaDB GSSAPI authentication plugin error
+      if (authError.code === 'AUTH_SWITCH_PLUGIN_ERROR' && authError.message?.includes('auth_gssapi_client')) {
+        return NextResponse.json({
+          error: 'MariaDB Authentication Plugin Not Supported',
+          message: 'Your MariaDB server is using the auth_gssapi_client authentication plugin, which is not supported by this application.',
+          solution: 'Please run these commands in MariaDB to fix:',
+          fixCommands: [
+            "ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('your_password');",
+            "FLUSH PRIVILEGES;"
+          ],
+          helpText: 'Replace your_password with your actual password, or use an empty string PASSWORD(\'\') if you have no password.',
+          technicalDetails: authError.message
+        }, { status: 400 });
+      }
+      
+      // Handle wrong password / access denied
+      if (authError.code === 'ER_ACCESS_DENIED_ERROR') {
+        const usingPassword = authError.message?.includes('using password: YES');
+        return NextResponse.json({
+          error: 'Wrong Password or Access Denied',
+          message: usingPassword 
+            ? 'The password you entered is incorrect.'
+            : 'Access denied. This user may require a password.',
+          solution: 'Try one of these solutions:',
+          fixCommands: usingPassword ? [
+            "1. Delete this connection and create a new one with the correct password",
+            "2. Or check your MariaDB password by connecting manually:",
+            "   mysql.exe -u root -p",
+            "3. Or reset your MariaDB password:",
+            "   ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('newpassword');",
+            "   FLUSH PRIVILEGES;"
+          ] : [
+            "1. Set a password for your MariaDB user:",
+            "   ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('yourpassword');",
+            "   FLUSH PRIVILEGES;",
+            "2. Or allow no password:",
+            "   ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('');",
+            "   FLUSH PRIVILEGES;"
+          ],
+          helpText: 'Make sure the password in your connection matches what you use when connecting to MariaDB manually.',
+          technicalDetails: authError.message
+        }, { status: 401 });
+      }
+      
+      throw authError;
+    }
+
+    try {
 
       // Get database name from connection config
       const database = typeof connectionConfig === 'object' ? connectionConfig.database : '';

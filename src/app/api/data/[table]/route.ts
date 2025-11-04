@@ -72,8 +72,8 @@ export async function GET(
 
     console.log('[API /data GET] Table:', table, 'Type:', dbType || '(none)');
 
-    // New secure model for Postgres/MySQL/MariaDB/MongoDB using connectionId
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
+    // New secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL using connectionId
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
       // Resolve credentials server-side
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
@@ -81,6 +81,50 @@ export async function GET(
       // Enforce ownership when present
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mssql') {
+        // MSSQL using connection string from config
+        const sql = require('mssql');
+        if (!cfg.connectionString) {
+          return NextResponse.json({ error: 'MSSQL connection string not found' }, { status: 500 });
+        }
+        const config: any = {};
+        const parts = cfg.connectionString.split(';');
+        
+        for (const part of parts) {
+          const [key, value] = part.split('=');
+          if (key && value) {
+            const k = key.trim().toLowerCase();
+            const v = value.trim();
+            if (k === 'server') {
+              const serverPart = v.replace('tcp:', '');
+              const [host, port] = serverPart.split(',');
+              config.server = host;
+              config.port = port ? parseInt(port) : 1433;
+            } else if (k === 'database') {
+              config.database = v;
+            } else if (k === 'user id' || k === 'uid') {
+              config.user = v;
+            } else if (k === 'password' || k === 'pwd') {
+              config.password = v;
+            } else if (k === 'encrypt') {
+              config.encrypt = v.toLowerCase() === 'true';
+            } else if (k === 'trustservercertificate') {
+              config.trustServerCertificate = v.toLowerCase() === 'true';
+            }
+          }
+        }
+        
+        try {
+          const pool = await sql.connect(config);
+          const result = await pool.request().query(`SELECT TOP ${limit} * FROM ${table}`);
+          await pool.close();
+          return NextResponse.json({ data: result.recordset, count: result.recordset.length });
+        } catch (err: any) {
+          console.error('[API /data GET][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Query error', details: err.message }, { status: 500 });
+        }
       }
 
       if (dbType === 'mongodb') {
@@ -300,12 +344,64 @@ export async function POST(
     const requesterId = request.headers.get('x-user-id') || request.headers.get('x-user') || undefined;
 
     // If connectionId + supported engine are present, use server-side credentials
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb')) {
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+      
       if (cfg.ownerId && requesterId && cfg.ownerId !== requesterId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (dbType === 'mssql') {
+        const sql = require('mssql');
+        if (!cfg.connectionString) {
+          return NextResponse.json({ error: 'MSSQL connection string not found' }, { status: 500 });
+        }
+        const config: any = {};
+        const parts = cfg.connectionString.split(';');
+        for (const part of parts) {
+          const [key, value] = part.split('=');
+          if (key && value) {
+            const k = key.trim().toLowerCase();
+            const v = value.trim();
+            if (k === 'server') {
+              const serverPart = v.replace('tcp:', '');
+              const [host, port] = serverPart.split(',');
+              config.server = host;
+              config.port = port ? parseInt(port) : 1433;
+            } else if (k === 'database') {
+              config.database = v;
+            } else if (k === 'user id' || k === 'uid') {
+              config.user = v;
+            } else if (k === 'password' || k === 'pwd') {
+              config.password = v;
+            } else if (k === 'encrypt') {
+              config.encrypt = v.toLowerCase() === 'true';
+            } else if (k === 'trustservercertificate') {
+              config.trustServerCertificate = v.toLowerCase() === 'true';
+            }
+          }
+        }
+        
+        try {
+          const pool = await sql.connect(config);
+          const columns = Object.keys(body);
+          const values = Object.values(body);
+          const placeholders = values.map((_, i) => `@param${i}`).join(', ');
+          const columnsList = columns.join(', ');
+          const query = `INSERT INTO ${table} (${columnsList}) OUTPUT INSERTED.* VALUES (${placeholders})`;
+          const preparedRequest = pool.request();
+          values.forEach((val, i) => {
+            preparedRequest.input(`param${i}`, val);
+          });
+          const result = await preparedRequest.query(query);
+          await pool.close();
+          return NextResponse.json({ success: true, id: result.recordset[0]?.id, data: result.recordset[0] });
+        } catch (err: any) {
+          console.error('[API /data POST][mssql] error:', err?.message || err);
+          return NextResponse.json({ error: 'Insert error', details: err.message }, { status: 500 });
+        }
       }
 
       const columns = Object.keys(body);

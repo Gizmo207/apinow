@@ -27,7 +27,7 @@ export const MONGODB_PROVIDERS: ProviderConfig[] = [
           v.includes('mongodb') && (v.includes('mongodb.net') || v.includes('mongodb+srv://'))
             ? true
             : 'Must be a valid MongoDB connection string',
-        helpText: '✅ Paste exactly as copied from Atlas. Leave <db_password> placeholder unchanged.',
+        helpText: 'Paste exactly as copied from Atlas. Leave <db_password> placeholder unchanged.',
       },
       {
         name: 'password',
@@ -35,7 +35,7 @@ export const MONGODB_PROVIDERS: ProviderConfig[] = [
         type: 'password',
         required: true,
         placeholder: 'Paste the password you copied',
-        helpText: '✅ The password you just generated in Database Access (not <db_password>)',
+        helpText: 'The password you just generated in Database Access (not <db_password>)',
       },
       {
         name: 'database',
@@ -43,7 +43,7 @@ export const MONGODB_PROVIDERS: ProviderConfig[] = [
         type: 'text',
         required: true,
         placeholder: 'sample_mflix',
-        helpText: '✅ The name of the database you want to connect to (visible in Browse Collections)',
+        helpText: 'The name of the database you want to connect to (visible in Browse Collections)',
       },
     ],
   },

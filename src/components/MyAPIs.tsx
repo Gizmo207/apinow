@@ -39,8 +39,6 @@ export function MyAPIs({ onNavigateToTester }: MyAPIsProps = {}) {
   };
 
   const deleteEndpoint = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this endpoint?')) return;
-    
     setDeletingId(id);
     try {
       const endpoints = JSON.parse(localStorage.getItem('saved_endpoints') || '[]');

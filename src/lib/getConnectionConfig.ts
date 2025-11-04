@@ -96,7 +96,8 @@ export async function getConnectionConfig(connectionId: string): Promise<Connect
   }
 
   // Validate required fields for SQL databases
-  if (!host || !user || !password) return null;
+  // Note: password can be empty string for local databases with no password
+  if (!host || !user || password === null || password === undefined) return null;
 
   const port = typeof portRaw === 'string' ? parseInt(portRaw, 10) : Number(portRaw);
   const db = database || (type === 'mysql' || type === 'mariadb' ? '' : 'postgres');
