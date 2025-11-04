@@ -10,13 +10,26 @@ export async function POST(request: NextRequest) {
   let tempFilePath: string | null = null;
   
   try {
-    const { filePath, fileData } = await request.json();
+    const { filePath, fileData, blobUrl } = await request.json();
     
-    // Handle both old filePath and new fileData approach
+    // Handle three approaches: blobUrl (server-stored), fileData (browser-uploaded), filePath (localhost)
     let dbPath: string;
     
-    if (fileData) {
-      // New approach: receive base64 file data
+    if (blobUrl) {
+      // Server-stored approach: fetch from Vercel Blob
+      console.log('[SQLite Introspect] Fetching from blob:', blobUrl);
+      const response = await fetch(blobUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch blob: ${response.statusText}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      tempFilePath = join(tmpdir(), `blob_${Date.now()}.db`);
+      writeFileSync(tempFilePath, buffer);
+      dbPath = tempFilePath;
+      console.log('[SQLite Introspect] Downloaded blob to temp file');
+    } else if (fileData) {
+      // Browser approach: receive base64 file data
       const buffer = Buffer.from(fileData, 'base64');
       tempFilePath = join(tmpdir(), `temp_${Date.now()}.db`);
       writeFileSync(tempFilePath, buffer);
@@ -25,7 +38,7 @@ export async function POST(request: NextRequest) {
       // Old approach: file path (localhost only)
       dbPath = filePath;
     } else {
-      return NextResponse.json({ error: 'No file data provided' }, { status: 400 });
+      return NextResponse.json({ error: 'No file data provided (need blobUrl, fileData, or filePath)' }, { status: 400 });
     }
 
     const db = new Database(dbPath, { readonly: true });
