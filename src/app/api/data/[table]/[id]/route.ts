@@ -282,8 +282,8 @@ export async function PUT(
 
     console.log('[API /data/[table]/[id] PUT] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL/GoogleSheets
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql' || dbType === 'googlesheets')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
@@ -382,7 +382,8 @@ export async function PUT(
           const updatedRow = jsonToSheetRow(updatedData, headers);
           
           // Update in Google Sheets (row index + 2 because: 1 for 1-based indexing, 1 for header row)
-          await updateRows(sheetId, table, rowIndex + 2, [updatedRow]);
+          const actualRow = rowIndex + 2;
+          await updateRows(sheetId, `${table}!A${actualRow}`, [updatedRow]);
           
           return NextResponse.json({ success: true, row: updatedData, changes: 1 });
         } catch (err: any) {
@@ -596,8 +597,8 @@ export async function DELETE(
 
     console.log('[API /data/[table]/[id] DELETE] Table:', table, 'ID:', id, 'Type:', dbType || '(none)');
 
-    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL
-    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql')) {
+    // Secure model for Postgres/MySQL/MariaDB/MongoDB/MSSQL/GoogleSheets
+    if (connectionId && (dbType === 'postgresql' || dbType === 'mysql' || dbType === 'mariadb' || dbType === 'mongodb' || dbType === 'mssql' || dbType === 'googlesheets')) {
       const { getConnectionConfig } = await import('@/lib/getConnectionConfig');
       const cfg = await getConnectionConfig(connectionId);
       if (!cfg) return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
@@ -675,7 +676,8 @@ export async function DELETE(
           }
           
           // Delete from Google Sheets (row index + 2 because: 1 for 1-based indexing, 1 for header row)
-          await deleteRows(sheetId, table, rowIndex + 2, 1);
+          const actualRow = rowIndex + 2;
+          await deleteRows(sheetId, `${table}!A${actualRow}:Z${actualRow}`);
           
           return NextResponse.json({ success: true, changes: 1, message: 'Record deleted successfully' });
         } catch (err: any) {
