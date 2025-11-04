@@ -448,12 +448,22 @@ export default function DashboardPage() {
                                     
                                     if (testEndpoint.columns) {
                                       testEndpoint.columns.forEach((col: any) => {
-                                        if (col.primaryKey || col.name === 'id') return;
-                                        const colType = col.type?.toLowerCase() || '';
+                                        // Skip primary keys unless it's a UUID that needs to be provided
+                                        if (col.primaryKey && !col.type?.toLowerCase().includes('uuid')) return;
+                                        if (col.name === 'id' && !col.type?.toLowerCase().includes('uuid')) return;
+                                        
+                                        // Skip foreign key UUID fields
                                         const colName = col.name?.toLowerCase() || '';
+                                        if (colName.endsWith('_id') && col.type?.toLowerCase().includes('uuid')) {
+                                          return; // Skip foreign keys
+                                        }
+                                        
+                                        const colType = col.type?.toLowerCase() || '';
                                         
                                         if (colType.includes('uuid')) {
                                           testData[col.name] = generateUUID();
+                                        } else if (colType.includes('json')) {
+                                          testData[col.name] = {};
                                         } else if (colType.includes('int')) {
                                           testData[col.name] = 1;
                                         } else if (colType.includes('bool')) {
@@ -466,6 +476,14 @@ export default function DashboardPage() {
                                           testData[col.name] = `user${timestamp}`;
                                         } else if (colName.includes('phone')) {
                                           testData[col.name] = `555${timestamp.toString().slice(-7)}`;
+                                        } else if (colName === 'method') {
+                                          testData[col.name] = 'GET';
+                                        } else if (colName === 'status' || colName.includes('status')) {
+                                          testData[col.name] = 'active';
+                                        } else if (colName === 'path' || colName.includes('endpoint')) {
+                                          testData[col.name] = '/api/test';
+                                        } else if (colName.includes('name') || colName.includes('title')) {
+                                          testData[col.name] = `Test ${col.name} ${timestamp}`;
                                         } else {
                                           testData[col.name] = `Example ${col.name} ${timestamp}`;
                                         }
@@ -483,7 +501,16 @@ export default function DashboardPage() {
                                       
                                       if (createResponse.ok) {
                                         const createResult = await createResponse.json();
-                                        const newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                                        let newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                                        
+                                        // For PostgreSQL, check if there's a UUID primary key in the returned row
+                                        if (!newId && createResult.row && testEndpoint.columns) {
+                                          const pkColumn = testEndpoint.columns.find((col: any) => col.primaryKey);
+                                          if (pkColumn) {
+                                            newId = createResult.row[pkColumn.name];
+                                          }
+                                        }
+                                        
                                         if (newId) {
                                           testPath = testPath.replace(':id', String(newId));
                                         } else {

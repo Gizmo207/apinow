@@ -74,7 +74,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         res = await fetch('/api/mongodb/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+          body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else {
         alert('Database type not yet supported');

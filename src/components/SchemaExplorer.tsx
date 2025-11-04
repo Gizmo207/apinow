@@ -70,7 +70,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
         res = await fetch('/api/mongodb/connect', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ connectionString: selectedDb.connectionString })
+          body: JSON.stringify({ connectionId: selectedDb.id })
         });
       } else {
         alert('Database type not yet supported');

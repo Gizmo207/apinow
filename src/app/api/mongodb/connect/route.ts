@@ -5,7 +5,22 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const { connectionString } = await request.json();
+    const body = await request.json();
+    let connectionString = body.connectionString;
+
+    // If connectionId provided, look up credentials server-side
+    if (body.connectionId && !connectionString) {
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const snap = await adminDb.collection('database_connections').doc(body.connectionId).get();
+      if (!snap.exists) {
+        return NextResponse.json({ error: 'Invalid connectionId' }, { status: 404 });
+      }
+      const data = snap.data();
+      connectionString = data?.connectionString;
+      if (!connectionString) {
+        return NextResponse.json({ error: 'No connectionString found for this connection' }, { status: 404 });
+      }
+    }
 
     if (!connectionString) {
       return NextResponse.json(
@@ -15,6 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[MongoDB Connect] Attempting connection...');
+    console.log('[MongoDB Connect] Connection string:', connectionString);
 
     // Create MongoDB client
     const client = new MongoClient(connectionString, {

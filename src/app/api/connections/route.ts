@@ -143,8 +143,29 @@ export async function POST(req: NextRequest) {
           database: sanitizeString(body.database) || parsed.database,
           ssl: body.ssl != null ? parseBoolean(body.ssl) : (parsed.ssl ?? false),
         };
+      } else if (type === 'mongodb') {
+        // For MongoDB, inject database name into connection string if missing
+        const database = sanitizeString(body.database) || 'test';
+        let finalConnectionString = connectionString;
+        
+        // Simple approach: if /? exists (no database), inject database name
+        if (connectionString.includes('/?')) {
+          finalConnectionString = connectionString.replace('/?', `/${database}?`);
+        } else if (connectionString.endsWith('/')) {
+          finalConnectionString = connectionString + database;
+        }
+        // else: database probably already in URL, leave as-is
+        
+        console.log('[MongoDB] Original:', connectionString);
+        console.log('[MongoDB] Final:', finalConnectionString);
+        
+        docData = {
+          ...docData,
+          connectionString: finalConnectionString,
+          database,
+        };
       } else {
-        // Persist as-is for now (mongodb/mssql/redis)
+        // Persist as-is for now (mssql/redis)
         docData = {
           ...docData,
           connectionString,

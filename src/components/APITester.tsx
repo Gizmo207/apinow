@@ -65,12 +65,22 @@ export function APITester() {
                   };
                   
                   matchingEndpoint.columns.forEach((col: any) => {
-                    if (col.primaryKey || col.name === 'id') return;
-                    const colType = col.type?.toLowerCase() || '';
+                    // Skip primary keys unless it's a UUID that needs to be provided
+                    if (col.primaryKey && !col.type?.toLowerCase().includes('uuid')) return;
+                    if (col.name === 'id' && !col.type?.toLowerCase().includes('uuid')) return;
+                    
+                    // Skip foreign key UUID fields (usually end with _id and reference other tables)
                     const colName = col.name?.toLowerCase() || '';
+                    if (colName.endsWith('_id') && col.type?.toLowerCase().includes('uuid')) {
+                      return; // Skip foreign keys
+                    }
+                    
+                    const colType = col.type?.toLowerCase() || '';
                     
                     if (colType.includes('uuid')) {
                       testData[col.name] = generateUUID();
+                    } else if (colType.includes('json')) {
+                      testData[col.name] = {};
                     } else if (colType.includes('int')) {
                       testData[col.name] = 1;
                     } else if (colType.includes('bool')) {
@@ -83,6 +93,14 @@ export function APITester() {
                       testData[col.name] = `user${timestamp}`;
                     } else if (colName.includes('phone')) {
                       testData[col.name] = `555${timestamp.toString().slice(-7)}`;
+                    } else if (colName === 'method') {
+                      testData[col.name] = 'GET';
+                    } else if (colName === 'status' || colName.includes('status')) {
+                      testData[col.name] = 'active';
+                    } else if (colName === 'path' || colName.includes('endpoint')) {
+                      testData[col.name] = '/api/test';
+                    } else if (colName.includes('name') || colName.includes('title')) {
+                      testData[col.name] = `Test ${col.name} ${timestamp}`;
                     } else {
                       testData[col.name] = `Example ${col.name} ${timestamp}`;
                     }
@@ -105,7 +123,17 @@ export function APITester() {
                   const createResult = await createResponse.json();
                   console.log('[Auto-fill] Create response:', createResult);
                   
-                  const newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                  // Extract ID - could be integer or UUID
+                  let newId = createResult.id || createResult.data?.id || createResult.row?.id;
+                  
+                  // For PostgreSQL, check if there's a UUID primary key in the returned row
+                  if (!newId && createResult.row) {
+                    const pkColumn = matchingEndpoint.columns?.find((col: any) => col.primaryKey);
+                    if (pkColumn) {
+                      newId = createResult.row[pkColumn.name];
+                    }
+                  }
+                  
                   console.log('[Auto-fill] Extracted ID:', newId);
                   
                   if (newId) {
@@ -169,17 +197,24 @@ export function APITester() {
             };
             
             matchingEndpoint.columns.forEach((col: any) => {
-              // Skip auto-increment primary keys
-              if (col.primaryKey && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial') || col.name === 'id')) {
+              // Skip auto-increment primary keys (but allow UUID primary keys)
+              if (col.primaryKey && !col.type?.toLowerCase().includes('uuid') && (col.type?.toLowerCase().includes('auto') || col.type?.toLowerCase().includes('serial') || col.name === 'id')) {
                 return;
+              }
+              
+              // Skip foreign key UUID fields
+              const colName = col.name?.toLowerCase() || '';
+              if (colName.endsWith('_id') && col.type?.toLowerCase().includes('uuid')) {
+                return; // Skip foreign keys
               }
               
               // Generate example values based on column type
               const colType = col.type?.toLowerCase() || '';
-              const colName = col.name?.toLowerCase() || '';
               
               if (colType.includes('uuid')) {
                 exampleBody[col.name] = generateUUID();
+              } else if (colType.includes('json')) {
+                exampleBody[col.name] = {};
               } else if (colType.includes('int') || colType.includes('number')) {
                 exampleBody[col.name] = 1;
               } else if (colType.includes('bool')) {
@@ -192,6 +227,14 @@ export function APITester() {
                 exampleBody[col.name] = `user${timestamp}`;
               } else if (colName.includes('phone')) {
                 exampleBody[col.name] = `555${timestamp.toString().slice(-7)}`;
+              } else if (colName === 'method') {
+                exampleBody[col.name] = 'GET';
+              } else if (colName === 'status' || colName.includes('status')) {
+                exampleBody[col.name] = 'active';
+              } else if (colName === 'path' || colName.includes('endpoint')) {
+                exampleBody[col.name] = '/api/test';
+              } else if (colName.includes('name') || colName.includes('title')) {
+                exampleBody[col.name] = `Test ${col.name} ${timestamp}`;
               } else {
                 exampleBody[col.name] = `Example ${col.name} ${timestamp}`;
               }
