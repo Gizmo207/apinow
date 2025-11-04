@@ -116,9 +116,10 @@ export function APIBuilder({ databases }: APIBuilderProps) {
 
   const generateAvailableEndpoints = (tablesList: any[]) => {
     const allEndpoints: any[] = [];
+    const isSQLite = selectedDb.type === 'sqlite';
     
     tablesList.forEach(table => {
-      // GET all
+      // GET all (available for all database types)
       allEndpoints.push({
         id: `${selectedDb.id}-${table.name}-list`,
         table: table.name,
@@ -130,19 +131,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         columns: table.columns || []
       });
       
-      // POST create
-      allEndpoints.push({
-        id: `${selectedDb.id}-${table.name}-create`,
-        table: table.name,
-        method: 'POST',
-        path: `/api/data/${table.name}`,
-        description: `Create a new record in ${table.name}`,
-        collection: table.name,
-        idType: 'users-create',
-        columns: table.columns || []
-      });
-      
-      // GET single
+      // GET single (available for all database types)
       allEndpoints.push({
         id: `${selectedDb.id}-${table.name}-read`,
         table: table.name,
@@ -154,29 +143,45 @@ export function APIBuilder({ databases }: APIBuilderProps) {
         columns: table.columns || []
       });
       
-      // PUT update
-      allEndpoints.push({
-        id: `${selectedDb.id}-${table.name}-update`,
-        table: table.name,
-        method: 'PUT',
-        path: `/api/data/${table.name}/:id`,
-        description: `Update a record in ${table.name}`,
-        collection: table.name,
-        idType: 'users-update',
-        columns: table.columns || []
-      });
-      
-      // DELETE
-      allEndpoints.push({
-        id: `${selectedDb.id}-${table.name}-delete`,
-        table: table.name,
-        method: 'DELETE',
-        path: `/api/data/${table.name}/:id`,
-        description: `Delete a record from ${table.name}`,
-        collection: table.name,
-        columns: table.columns || [],
-        idType: 'users-delete'
-      });
+      // Write operations (POST/PUT/DELETE) only for non-SQLite databases
+      // SQLite in production is READ-ONLY (industry standard)
+      if (!isSQLite) {
+        // POST create
+        allEndpoints.push({
+          id: `${selectedDb.id}-${table.name}-create`,
+          table: table.name,
+          method: 'POST',
+          path: `/api/data/${table.name}`,
+          description: `Create a new record in ${table.name}`,
+          collection: table.name,
+          idType: 'users-create',
+          columns: table.columns || []
+        });
+        
+        // PUT update
+        allEndpoints.push({
+          id: `${selectedDb.id}-${table.name}-update`,
+          table: table.name,
+          method: 'PUT',
+          path: `/api/data/${table.name}/:id`,
+          description: `Update a record in ${table.name}`,
+          collection: table.name,
+          idType: 'users-update',
+          columns: table.columns || []
+        });
+        
+        // DELETE
+        allEndpoints.push({
+          id: `${selectedDb.id}-${table.name}-delete`,
+          table: table.name,
+          method: 'DELETE',
+          path: `/api/data/${table.name}/:id`,
+          description: `Delete a record from ${table.name}`,
+          collection: table.name,
+          columns: table.columns || [],
+          idType: 'users-delete'
+        });
+      }
     });
     
     setEndpoints(allEndpoints);
@@ -246,8 +251,15 @@ export function APIBuilder({ databases }: APIBuilderProps) {
             >
               <div className="flex items-center gap-3">
                 <Database className="w-6 h-6 text-blue-600" />
-                <div>
-                  <h3 className="font-semibold">{db.name}</h3>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{db.name}</h3>
+                    {db.type === 'sqlite' && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">
+                        READ-ONLY
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600 capitalize">{db.type}</p>
                 </div>
               </div>
@@ -260,6 +272,25 @@ export function APIBuilder({ databases }: APIBuilderProps) {
       {selectedDb && (
         <div className="bg-white rounded-lg border p-6">
           <h2 className="text-lg font-semibold mb-4">Available Endpoints</h2>
+          
+          {/* SQLite Read-Only Info */}
+          {selectedDb.type === 'sqlite' && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex gap-2">
+                <span className="text-blue-600 text-lg">ℹ️</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 mb-1">SQLite Production Mode: Read-Only</p>
+                  <p className="text-sm text-blue-700">
+                    Only GET (read) endpoints are available. This is industry standard for SQLite in production environments. 
+                    Write operations (POST/PUT/DELETE) are not supported on blob storage.
+                  </p>
+                  <p className="text-xs text-blue-600 mt-2">
+                    Need write operations? Use PostgreSQL, MySQL, or MongoDB instead.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {loading ? (
             <p className="text-gray-600">Loading tables...</p>
