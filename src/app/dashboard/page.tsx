@@ -50,6 +50,8 @@ export default function DashboardPage() {
       setViewHistory(prev => [...prev, currentView]);
       setCurrentView(newView);
       localStorage.setItem('dashboardView', newView);
+      // Scroll to top when changing views
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -60,6 +62,8 @@ export default function DashboardPage() {
       setViewHistory(prev => prev.slice(0, -1));
       setCurrentView(previousView);
       localStorage.setItem('dashboardView', previousView);
+      // Scroll to top when going back
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
