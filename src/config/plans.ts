@@ -66,11 +66,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
       'Unlimited databases',
       'Unlimited API keys',
       'Unlimited endpoints',
-      'Custom domains',
-      'Private cloud deployment',
-      'SSO & SAML',
-      'SLA guarantee',
-      'Dedicated support',
+      'Priority email support',
+      'Advanced analytics',
     ],
   },
 };

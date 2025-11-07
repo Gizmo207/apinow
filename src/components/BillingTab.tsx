@@ -149,12 +149,12 @@ export function BillingTab({ user }: BillingTabProps) {
               key={plan.id}
               className={`border rounded-lg p-6 ${
                 plan.isCurrent
-                  ? 'border-blue-600 bg-blue-50'
-                  : 'border-gray-200 bg-white'
+                  ? 'border-blue-500 bg-slate-800'
+                  : 'border-gray-700 bg-slate-800'
               }`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
+                <h3 className="text-lg font-bold text-white">{plan.name}</h3>
                 {plan.isCurrent && (
                   <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
                     Current
@@ -162,13 +162,13 @@ export function BillingTab({ user }: BillingTabProps) {
                 )}
               </div>
 
-              <div className="text-3xl font-bold text-gray-900 mb-2">{plan.price}</div>
+              <div className="text-3xl font-bold text-white mb-2">{plan.price}</div>
 
               <ul className="space-y-2 mb-6">
                 {plan.features.map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700">{feature}</span>
+                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-300">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -188,7 +188,7 @@ export function BillingTab({ user }: BillingTabProps) {
               )}
 
               {plan.isCurrent && plan.id !== 'free' && (
-                <div className="text-sm text-center text-gray-600">
+                <div className="text-sm text-center text-gray-400">
                   Manage subscription in Stripe portal
                 </div>
               )}
