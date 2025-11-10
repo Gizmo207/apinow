@@ -518,7 +518,7 @@ export function APITester() {
               </thead>
               <tbody>
                 {actualData.map((row: any, rowIndex: number) => (
-                  <tr key={rowIndex} className="hover:bg-gray-50">
+                  <tr key={rowIndex} className="hover:bg-blue-50/30">
                     {headers.map(header => (
                       <td key={header} className="border border-gray-300 px-3 py-2 text-sm text-gray-600">
                         {formatValue(row[header])}

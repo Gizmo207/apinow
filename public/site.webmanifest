@@ -1,7 +1,7 @@
 {
-  "name": "APIFlow",
-  "short_name": "APIFlow",
-  "description": "Turn Your Database Into Powerful APIs",
+  "name": "APINOW",
+  "short_name": "APINOW",
+  "description": "Turn any Database Into Powerful REST APIs",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

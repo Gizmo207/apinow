@@ -359,7 +359,7 @@ export function SchemaExplorer({ databases }: SchemaExplorerProps) {
                     </thead>
                     <tbody>
                       {tableData.map((row, i) => (
-                        <tr key={i} className="border-t hover:bg-gray-50">
+                        <tr key={i} className="border-t hover:bg-blue-50/30">
                           {selectedTable.columns.map((col: any) => (
                             <td key={col.name} className="px-4 py-2">
                               {row[col.name] !== null && row[col.name] !== undefined

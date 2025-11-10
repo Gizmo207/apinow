@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 <div className="p-6">
                   <div className="space-y-3">
                     {apiKeys.map((key) => (
-                      <div key={key.id} className="border rounded-lg p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <div key={key.id} className="border rounded-lg p-4 flex items-center justify-between hover:bg-blue-50/30 transition-colors">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="font-medium text-gray-900">{key.name}</span>

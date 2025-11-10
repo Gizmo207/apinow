@@ -359,7 +359,7 @@ export function APIBuilder({ databases }: APIBuilderProps) {
                     {/* Endpoints for this table */}
                     <div className="space-y-3">
                       {tableEndpoints.map(endpoint => (
-                        <div key={endpoint.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                        <div key={endpoint.id} className="border rounded-lg p-3 hover:bg-blue-50/30 transition-colors">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-1">
